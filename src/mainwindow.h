@@ -26,6 +26,7 @@ class GlassButton;
 class GameCard;
 #include "notificationdialog.h"
 #include "chatpage.h"
+#include "friendpopover.h"
 #include "utils/gameinfo.h"
 #include "terminaldialog.h"
 #include "workers/indexdownloadworker.h"
@@ -118,9 +119,10 @@ private slots:
     void onGameDetailsBack();
     void onInstallFromDetails(const QString& appId, const QString& name, bool hasFix);
     
-    // Chat
+    // Chat & Social
     void openChat(const QString& friendUsername);
     void onChatBack();
+    void removeFriend(const QString& friendUsername);
 
     // Sidebar
     void expandSidebar();
@@ -207,6 +209,7 @@ private:
     GlassButton* m_tabLua;
     
     ChatPage* m_chatPage = nullptr;
+    FriendPopover* m_friendPopover = nullptr;
     int m_prevStackIndex = 0;
     GlassButton* m_tabLibrary;
     GlassButton* m_tabSettings;

@@ -2733,8 +2733,26 @@ void MainWindow::refreshFriendsList() {
             );
             
             QString fName = f["username"].toString();
-            connect(friendBtn, &QPushButton::clicked, this, [this, fName]() {
-                openChat(fName);
+            QString fAvatarUrl = f["avatar_url"].toString();
+            connect(friendBtn, &QPushButton::clicked, this, [this, friendBtn, fName, fAvatarUrl]() {
+                if (m_friendPopover) {
+                    m_friendPopover->deleteLater();
+                }
+                m_friendPopover = new FriendPopover(fName, fAvatarUrl, this);
+                
+                // Connect signals
+                connect(m_friendPopover, &FriendPopover::messageClicked, this, &MainWindow::openChat);
+                connect(m_friendPopover, &FriendPopover::viewProfileClicked, this, [this](const QString&) {
+                    QMessageBox::information(this, "Coming Soon", "Profile viewing is coming soon!");
+                });
+                connect(m_friendPopover, &FriendPopover::removeFriendClicked, this, &MainWindow::removeFriend);
+                
+                // Map the left-center of the friendBtn to global coordinates
+                // We map to parent of 'this' just in case, but mapToGlobal handles screen coords
+                // Since FriendPopover is a popup, it needs screen coords
+                QPoint globalPos = friendBtn->mapToGlobal(QPoint(0, friendBtn->height() / 2));
+                
+                m_friendPopover->popup(globalPos);
             });
 
             QHBoxLayout* lay = new QHBoxLayout(friendBtn);
@@ -2818,6 +2836,33 @@ void MainWindow::openChat(const QString& friendUsername) {
 
 void MainWindow::onChatBack() {
     m_stack->setCurrentIndex(m_prevStackIndex);
+}
+
+void MainWindow::removeFriend(const QString& friendUsername) {
+    QJsonObject obj;
+    obj["username"] = m_username;
+    obj["friend_username"] = friendUsername;
+
+    QUrl url(Config::WEBSERVER_BASE_URL + "/api/social/friends/remove");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QNetworkReply* reply = m_networkManager->post(request, QJsonDocument(obj).toJson());
+    connect(reply, &QNetworkReply::finished, this, [this, reply, friendUsername]() {
+        reply->deleteLater();
+        if (reply->error() == QNetworkReply::NoError) {
+            QMessageBox::information(this, "Success", "Successfully removed " + friendUsername + " from friends.");
+            refreshFriendsList();
+            
+            // If we are currently chatting with them, close the chat
+            if (m_chatPage && m_stack->currentIndex() == 4) {
+                // Not ideal to assume but it works for now
+                onChatBack();
+            }
+        } else {
+            QMessageBox::warning(this, "Error", "Failed to remove friend. Error: " + reply->errorString());
+        }
+    });
 }
 
 void MainWindow::showBlurOverlay() {
