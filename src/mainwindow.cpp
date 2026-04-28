@@ -8,6 +8,9 @@
 #include "customtitlebar.h"
 #include "materialicons.h"
 #include "notificationdialog.h"
+#include "chatpage.h"
+#include "friendpopover.h"
+#include "userprofiledialog.h"
 #include "workers/indexdownloadworker.h"
 #include "workers/luadownloadworker.h"
 #include "workers/generatorworker.h"
@@ -2742,8 +2745,18 @@ void MainWindow::refreshFriendsList() {
                 
                 // Connect signals
                 connect(m_friendPopover, &FriendPopover::messageClicked, this, &MainWindow::openChat);
-                connect(m_friendPopover, &FriendPopover::viewProfileClicked, this, [this](const QString&) {
-                    QMessageBox::information(this, "Coming Soon", "Profile viewing is coming soon!");
+                connect(m_friendPopover, &FriendPopover::viewProfileClicked, this, [this](const QString& username) {
+                    UserProfileDialog* dlg = new UserProfileDialog(username, m_username, m_networkManager, this);
+                    
+                    // Show a blur overlay behind the dialog
+                    showBlurOverlay();
+                    
+                    // Center the dialog manually to be safe
+                    dlg->move(geometry().center() - dlg->rect().center());
+                    dlg->exec();
+                    
+                    hideBlurOverlay();
+                    dlg->deleteLater();
                 });
                 connect(m_friendPopover, &FriendPopover::removeFriendClicked, this, &MainWindow::removeFriend);
                 
