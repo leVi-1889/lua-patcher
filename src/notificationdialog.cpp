@@ -31,7 +31,7 @@ NotificationDialog::NotificationDialog(const QString& currentUsername, QNetworkA
 {
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_DeleteOnClose);
-    setFixedSize(420, 500);
+    setFixedSize(520, 520);
 
     setupUI();
     fetchPendingRequests();
@@ -161,7 +161,7 @@ void NotificationDialog::setupUI() {
 
 QWidget* NotificationDialog::createUpdateCard() {
     QWidget* card = new QWidget();
-    card->setFixedHeight(80);
+    card->setMinimumHeight(80);
     card->setStyleSheet(
         "QWidget {"
         "  background: rgba(0, 230, 118, 0.1);" // Primary green tint
