@@ -57,12 +57,12 @@ private:
     
     // Games I Play section
     QWidget* m_playedGamesGrid = nullptr;
-    QHBoxLayout* m_playedGamesLayout = nullptr;
+    QGridLayout* m_playedGamesLayout = nullptr;
     QPushButton* m_addPlayedBtn = nullptr;
     
     // Games in Rotation section
     QWidget* m_rotationGamesGrid = nullptr;
-    QHBoxLayout* m_rotationGamesLayout = nullptr;
+    QGridLayout* m_rotationGamesLayout = nullptr;
     QPushButton* m_addRotationBtn = nullptr;
     
     // Search popup
