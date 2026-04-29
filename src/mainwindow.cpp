@@ -440,23 +440,16 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
                 }
             }
         } else if (obj == m_topProfileWidget) {
-            // Open profile card after the mouse event finishes processing
+            // Open user profile dialog
             QTimer::singleShot(50, this, [this]() {
                 showBlurOverlay();
-                ProfileCard* card = new ProfileCard(m_username, m_userData, m_networkManager, this);
-                
-                connect(card, &ProfileCard::avatarUpdated, this, [this](const QString& b64) {
-                    m_userData["avatar_url"] = b64;
-                    QSettings settings("LuaPatcher", "Client");
-                    settings.setValue("userData", QJsonDocument(m_userData).toJson());
-                    updateSidebarAvatar();
-                });
-                
-                card->move(geometry().center() - QPoint(card->width() / 2, card->height() / 2));
+                UserProfileDialog* dlg = new UserProfileDialog(m_username, m_username, m_networkManager, this);
+                dlg->move(geometry().center() - dlg->rect().center());
                 
                 QPointer<MainWindow> guard(this);
-                card->exec();
+                dlg->exec();
                 if (guard) guard->hideBlurOverlay();
+                dlg->deleteLater();
             });
             return true;
         }
