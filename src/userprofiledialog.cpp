@@ -16,7 +16,7 @@ UserProfileDialog::UserProfileDialog(const QString& targetUsername, const QStrin
     m_isOwnProfile = (m_targetUsername == m_myUsername);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     setAttribute(Qt::WA_TranslucentBackground);
-    setFixedSize(500, 800);
+    setFixedSize(500, 700);
     
     m_searchDebounce = new QTimer(this);
     m_searchDebounce->setSingleShot(true);
