@@ -26,6 +26,7 @@ public:
 protected:
     void paintEvent(QPaintEvent* event) override;
     void showEvent(QShowEvent* event) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:
     void onEditClicked();
@@ -50,7 +51,6 @@ private:
     // UI Elements
     QLabel* m_avatarLabel = nullptr;
     QLabel* m_usernameLabel = nullptr;
-    QLabel* m_levelLabel = nullptr;
     QPushButton* m_editBtn = nullptr;
     QPushButton* m_saveBtn = nullptr;
     QPushButton* m_cancelBtn = nullptr;
