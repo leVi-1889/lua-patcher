@@ -8,6 +8,8 @@
 #include <QJsonObject>
 #include <QGraphicsDropShadowEffect>
 #include <QApplication>
+#include <QPropertyAnimation>
+#include <QEasingCurve>
 
 UserProfileDialog::UserProfileDialog(const QString& targetUsername, const QString& myUsername, 
                                      QNetworkAccessManager* netMgr, QWidget* parent)
@@ -24,6 +26,9 @@ UserProfileDialog::UserProfileDialog(const QString& targetUsername, const QStrin
     connect(m_searchDebounce, &QTimer::timeout, this, &UserProfileDialog::doSearch);
     
     setupUI();
+    
+    // Initial state for animation
+    setWindowOpacity(0.0);
 }
 
 void UserProfileDialog::setupUI() {
@@ -41,17 +46,17 @@ void UserProfileDialog::setupUI() {
     );
     
     QVBoxLayout* main = new QVBoxLayout(container);
-    main->setContentsMargins(30,25,30,25);
-    main->setSpacing(15);
+    main->setContentsMargins(24, 20, 24, 20);
+    main->setSpacing(12);
     
     // === TOP BAR: Avatar + Username + Buttons ===
     QHBoxLayout* topBar = new QHBoxLayout();
     
     m_avatarLabel = new QLabel();
-    m_avatarLabel->setFixedSize(64,64);
-    m_avatarLabel->setStyleSheet("background: #4A6FA5; border-radius: 32px;");
+    m_avatarLabel->setFixedSize(90, 90);
+    m_avatarLabel->setStyleSheet("background: #1E293B; border-radius: 45px; border: 2px solid rgba(255,255,255,0.1);");
     topBar->addWidget(m_avatarLabel);
-    topBar->addSpacing(15);
+    topBar->addSpacing(18);
     
     QVBoxLayout* nameCol = new QVBoxLayout();
     m_usernameLabel = new QLabel(m_targetUsername);
@@ -115,14 +120,15 @@ void UserProfileDialog::setupUI() {
     QWidget* scrollContent = new QWidget();
     scrollContent->setStyleSheet("background:transparent;");
     QVBoxLayout* scrollLayout = new QVBoxLayout(scrollContent);
-    scrollLayout->setSpacing(20);
+    scrollLayout->setSpacing(12);
+    scrollLayout->setContentsMargins(0,0,0,0);
     scrollLayout->setAlignment(Qt::AlignTop);
     
     // --- GAMES I PLAY CARD ---
     QWidget* playedCard = new QWidget();
-    playedCard->setStyleSheet("background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:16px;");
+    playedCard->setStyleSheet("background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:12px;");
     QVBoxLayout* pcl = new QVBoxLayout(playedCard);
-    pcl->setContentsMargins(20,15,20,15);
+    pcl->setContentsMargins(16, 12, 16, 12);
     
     QHBoxLayout* pHeader = new QHBoxLayout();
     QLabel* pTitle = new QLabel("🎮 Games I play");
@@ -146,8 +152,8 @@ void UserProfileDialog::setupUI() {
     // Use QGridLayout to wrap cards
     QGridLayout* pGrid = new QGridLayout(m_playedGamesGrid);
     pGrid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    pGrid->setSpacing(15);
-    pGrid->setContentsMargins(0,10,0,10);
+    pGrid->setSpacing(12);
+    pGrid->setContentsMargins(0,8,0,8);
     m_playedGamesLayout = pGrid;
     pcl->addWidget(m_playedGamesGrid);
     
@@ -155,9 +161,9 @@ void UserProfileDialog::setupUI() {
     
     // --- GAMES IN ROTATION CARD ---
     QWidget* rotCard = new QWidget();
-    rotCard->setStyleSheet("background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:16px;");
+    rotCard->setStyleSheet("background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:12px;");
     QVBoxLayout* rcl = new QVBoxLayout(rotCard);
-    rcl->setContentsMargins(20,15,20,15);
+    rcl->setContentsMargins(16, 12, 16, 12);
     
     QHBoxLayout* rHeader = new QHBoxLayout();
     QLabel* rTitle = new QLabel("🔄 Games in rotation");
@@ -180,8 +186,8 @@ void UserProfileDialog::setupUI() {
     m_rotationGamesGrid->setStyleSheet("background:transparent; border:none;");
     QGridLayout* rGrid = new QGridLayout(m_rotationGamesGrid);
     rGrid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    rGrid->setSpacing(15);
-    rGrid->setContentsMargins(0,10,0,10);
+    rGrid->setSpacing(12);
+    rGrid->setContentsMargins(0,8,0,8);
     m_rotationGamesLayout = rGrid;
     rcl->addWidget(m_rotationGamesGrid);
     
@@ -205,6 +211,27 @@ void UserProfileDialog::paintEvent(QPaintEvent*) {
 
 void UserProfileDialog::showEvent(QShowEvent* e) {
     QDialog::showEvent(e);
+    
+    // Zoom-out & Fade-in Animation
+    QPropertyAnimation* fade = new QPropertyAnimation(this, "windowOpacity", this);
+    fade->setDuration(350);
+    fade->setStartValue(0.0);
+    fade->setEndValue(1.0);
+    fade->setEasingCurve(QEasingCurve::OutCubic);
+
+    QRect endGeom = geometry();
+    QRect startGeom = endGeom;
+    startGeom.adjust(30, 30, -30, -30); // Start slightly smaller
+
+    QPropertyAnimation* zoom = new QPropertyAnimation(this, "geometry", this);
+    zoom->setDuration(350);
+    zoom->setStartValue(startGeom);
+    zoom->setEndValue(endGeom);
+    zoom->setEasingCurve(QEasingCurve::OutBack);
+
+    fade->start(QAbstractAnimation::DeleteWhenStopped);
+    zoom->start(QAbstractAnimation::DeleteWhenStopped);
+
     fetchProfileData();
 }
 
@@ -229,14 +256,14 @@ void UserProfileDialog::populateData(const QJsonObject& data) {
         QPixmap original;
         original.loadFromData(QByteArray::fromBase64(avUrl.toUtf8()));
         if (!original.isNull()) {
-            QPixmap rounded(64,64);
+            QPixmap rounded(90, 90);
             rounded.fill(Qt::transparent);
             QPainter p(&rounded);
             p.setRenderHint(QPainter::Antialiasing);
             QPainterPath path;
-            path.addEllipse(0,0,64,64);
+            path.addEllipse(0,0,90,90);
             p.setClipPath(path);
-            p.drawPixmap(0,0,64,64, original.scaled(64,64,Qt::KeepAspectRatioByExpanding,Qt::SmoothTransformation));
+            p.drawPixmap(0,0,90,90, original.scaled(90,90,Qt::KeepAspectRatioByExpanding,Qt::SmoothTransformation));
             m_avatarLabel->setPixmap(rounded);
         }
     }
@@ -293,8 +320,8 @@ void UserProfileDialog::rebuildGamesGrid(QLayout* layout, const QJsonArray& game
 
 QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& name, const QString& thumbUrl, const QString& category) {
     QWidget* tile = new QWidget();
-    tile->setFixedSize(110, 185); // Vertical card size
-    tile->setStyleSheet("background:rgba(255,255,255,0.03); border-radius:12px; border:1px solid rgba(255,255,255,0.06);");
+    tile->setFixedSize(136, 215); // Larger card size
+    tile->setStyleSheet("background:rgba(255,255,255,0.03); border-radius:6px; border:1px solid rgba(255,255,255,0.06);");
     tile->setToolTip(name);
     
     QVBoxLayout* tl = new QVBoxLayout(tile);
@@ -303,8 +330,8 @@ QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& 
     
     // Thumbnail (vertical)
     QLabel* thumb = new QLabel();
-    thumb->setFixedSize(110, 150);
-    thumb->setStyleSheet("border-top-left-radius:12px; border-top-right-radius:12px; background:rgba(0,0,0,0.5); border:none;");
+    thumb->setFixedSize(136, 185);
+    thumb->setStyleSheet("border-top-left-radius:6px; border-top-right-radius:6px; background:rgba(0,0,0,0.5); border:none;");
     thumb->setScaledContents(true);
     tl->addWidget(thumb);
     
@@ -316,7 +343,7 @@ QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& 
             QPixmap pix;
             pix.loadFromData(imgReply->readAll());
             if (!pix.isNull() && thumb) {
-                thumb->setPixmap(pix.scaled(110,150,Qt::KeepAspectRatioByExpanding,Qt::SmoothTransformation));
+                thumb->setPixmap(pix.scaled(136,185,Qt::KeepAspectRatioByExpanding,Qt::SmoothTransformation));
             }
         } else {
             // Fallback to horizontal header if vertical capsule is missing
@@ -329,7 +356,7 @@ QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& 
                         QPixmap pix;
                         pix.loadFromData(fallbackReply->readAll());
                         if (!pix.isNull() && thumb) {
-                            thumb->setPixmap(pix.scaled(110,150,Qt::KeepAspectRatioByExpanding,Qt::SmoothTransformation));
+                            thumb->setPixmap(pix.scaled(136,185,Qt::KeepAspectRatioByExpanding,Qt::SmoothTransformation));
                         }
                     }
                 });
@@ -339,10 +366,10 @@ QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& 
     
     // Name label
     QLabel* nameLabel = new QLabel(name);
-    nameLabel->setFixedHeight(35);
-    nameLabel->setStyleSheet("color:rgba(255,255,255,0.8); font-size:11px; font-weight:bold; padding:0px 8px; background:transparent; border:none;");
+    nameLabel->setFixedHeight(30);
+    nameLabel->setStyleSheet("color:rgba(255,255,255,0.85); font-size:11px; font-weight:700; padding:0px 6px; background:transparent; border:none;");
     nameLabel->setWordWrap(true);
-    nameLabel->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+    nameLabel->setAlignment(Qt::AlignCenter);
     tl->addWidget(nameLabel);
     
     // Remove button (only in edit mode)
@@ -353,7 +380,7 @@ QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& 
             "QPushButton{background:rgba(231,76,60,0.8);color:white;border-radius:10px;font-size:10px;font-weight:bold;border:none;}"
             "QPushButton:hover{background:#E74C3C;}"
         );
-        removeBtn->move(90, 5);
+        removeBtn->move(114, 4);
         removeBtn->setParent(tile);
         removeBtn->show();
         removeBtn->raise();
