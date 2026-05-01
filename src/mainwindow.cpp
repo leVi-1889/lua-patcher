@@ -446,6 +446,13 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
                 UserProfileDialog* dlg = new UserProfileDialog(m_username, m_username, m_networkManager, this);
                 dlg->move(geometry().center() - dlg->rect().center());
                 
+                connect(dlg, &UserProfileDialog::avatarUpdated, this, [this](const QString& b64) {
+                    m_userData["avatar_url"] = b64;
+                    QSettings settings("LuaPatcher", "Client");
+                    settings.setValue("userData", QJsonDocument(m_userData).toJson());
+                    updateSidebarAvatar();
+                });
+                
                 QPointer<MainWindow> guard(this);
                 dlg->exec();
                 if (guard) guard->hideBlurOverlay();

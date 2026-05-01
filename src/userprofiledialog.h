@@ -23,6 +23,9 @@ public:
                                QNetworkAccessManager* netMgr, QWidget* parent = nullptr);
     ~UserProfileDialog() override = default;
 
+signals:
+    void avatarUpdated(const QString& newAvatarB64);
+
 protected:
     void paintEvent(QPaintEvent* event) override;
     void showEvent(QShowEvent* event) override;

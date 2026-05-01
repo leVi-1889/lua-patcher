@@ -478,6 +478,7 @@ void UserProfileDialog::saveProfile() {
     QNetworkReply* reply = m_netMgr->post(req, QJsonDocument(payload).toJson());
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { 
         if (reply->error() == QNetworkReply::NoError && !m_newAvatarB64.isEmpty()) {
+            emit avatarUpdated(m_newAvatarB64);
             // Update local state if avatar was changed
             m_newAvatarB64.clear();
         }
