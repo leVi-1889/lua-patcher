@@ -54,7 +54,7 @@ void UserProfileDialog::setupUI() {
     
     m_avatarLabel = new QLabel();
     m_avatarLabel->setFixedSize(90, 90);
-    m_avatarLabel->setStyleSheet("background: #1E293B; border-radius: 45px; border: 2px solid rgba(255,255,255,0.1);");
+    m_avatarLabel->setStyleSheet("background: transparent; border-radius: 45px; border: 2px solid rgba(255,255,255,0.1);");
     topBar->addWidget(m_avatarLabel);
     topBar->addSpacing(18);
     
@@ -259,8 +259,10 @@ void UserProfileDialog::populateData(const QJsonObject& data) {
             rounded.fill(Qt::transparent);
             QPainter p(&rounded);
             p.setRenderHint(QPainter::Antialiasing);
+            p.setRenderHint(QPainter::SmoothPixmapTransform);
+            
             QPainterPath path;
-            path.addEllipse(0,0,90,90);
+            path.addEllipse(0, 0, 90, 90);
             p.setClipPath(path);
             
             QPixmap scaled = original.scaled(90, 90, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
