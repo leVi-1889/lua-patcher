@@ -10,6 +10,8 @@
 #include <QApplication>
 #include <QPropertyAnimation>
 #include <QEasingCurve>
+#include <QFileDialog>
+#include <QBuffer>
 
 UserProfileDialog::UserProfileDialog(const QString& targetUsername, const QString& myUsername, 
                                      QNetworkAccessManager* netMgr, QWidget* parent)
@@ -55,6 +57,8 @@ void UserProfileDialog::setupUI() {
     m_avatarLabel = new QLabel();
     m_avatarLabel->setFixedSize(90, 90);
     m_avatarLabel->setStyleSheet("background: transparent; border-radius: 45px; border: 2px solid rgba(255,255,255,0.1);");
+    m_avatarLabel->setCursor(Qt::PointingHandCursor);
+    m_avatarLabel->installEventFilter(this);
     topBar->addWidget(m_avatarLabel);
     topBar->addSpacing(18);
     
@@ -446,6 +450,7 @@ void UserProfileDialog::onSaveClicked() {
 
 void UserProfileDialog::onCancelEditClicked() {
     m_isEditing = false;
+    m_newAvatarB64.clear();
     if (m_editBtn) m_editBtn->show();
     if (m_saveBtn) m_saveBtn->hide();
     if (m_cancelBtn) m_cancelBtn->hide();
@@ -460,6 +465,9 @@ void UserProfileDialog::saveProfile() {
     QJsonObject payload;
     payload["played_games"] = m_playedGames;
     payload["rotation_games"] = m_rotationGames;
+    if (!m_newAvatarB64.isEmpty()) {
+        payload["avatar_url"] = m_newAvatarB64;
+    }
     
     QUrl url(Config::WEBSERVER_BASE_URL + "/api/user/profile");
     url.setQuery("username=" + m_myUsername);
@@ -468,7 +476,42 @@ void UserProfileDialog::saveProfile() {
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     
     QNetworkReply* reply = m_netMgr->post(req, QJsonDocument(payload).toJson());
-    connect(reply, &QNetworkReply::finished, this, [reply]() { reply->deleteLater(); });
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() { 
+        if (reply->error() == QNetworkReply::NoError && !m_newAvatarB64.isEmpty()) {
+            // Update local state if avatar was changed
+            m_newAvatarB64.clear();
+        }
+        reply->deleteLater(); 
+    });
+}
+
+void UserProfileDialog::onAvatarClicked() {
+    QString fileName = QFileDialog::getOpenFileName(this, "Select Avatar", "", "Images (*.png *.jpg *.jpeg)");
+    if (fileName.isEmpty()) return;
+
+    QPixmap pix(fileName);
+    if (pix.isNull()) return;
+
+    // Convert to Base64
+    QByteArray ba;
+    QBuffer bu(&ba);
+    bu.open(QIODevice::WriteOnly);
+    pix.save(&bu, "PNG");
+    m_newAvatarB64 = ba.toBase64();
+
+    // Preview
+    QPixmap rounded(90, 90);
+    rounded.fill(Qt::transparent);
+    QPainter p(&rounded);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setRenderHint(QPainter::SmoothPixmapTransform);
+    QPainterPath path;
+    path.addEllipse(0, 0, 90, 90);
+    p.setClipPath(path);
+    
+    QPixmap scaled = pix.scaled(90, 90, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+    p.drawPixmap((90 - scaled.width()) / 2, (90 - scaled.height()) / 2, scaled);
+    m_avatarLabel->setPixmap(rounded);
 }
 
 void UserProfileDialog::onAddPlayedGame() {
@@ -644,6 +687,13 @@ void UserProfileDialog::doSearch() {
 }
 
 bool UserProfileDialog::eventFilter(QObject* obj, QEvent* event) {
+    if (obj == m_avatarLabel && event->type() == QEvent::MouseButtonRelease) {
+        if (m_isEditing && m_isOwnProfile) {
+            onAvatarClicked();
+            return true;
+        }
+    }
+
     if (event->type() == QEvent::Enter) {
         QWidget* tile = qobject_cast<QWidget*>(obj);
         if (tile) {

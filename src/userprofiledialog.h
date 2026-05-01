@@ -34,6 +34,7 @@ private slots:
     void onCancelEditClicked();
     void onAddPlayedGame();
     void onAddRotationGame();
+    void onAvatarClicked();
     void onSearchTextChanged(const QString& text);
     void doSearch();
 
@@ -82,6 +83,7 @@ private:
     
     QJsonArray m_playedGames;   // [{appId, name, thumbUrl}, ...]
     QJsonArray m_rotationGames;
+    QString m_newAvatarB64;
 };
 
 #endif // USERPROFILEDIALOG_H
