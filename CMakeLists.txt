@@ -155,3 +155,11 @@ endif()
 install(TARGETS LuaPatcher
     RUNTIME DESTINATION bin
 )
+
+# Strip executable in Release mode to prevent Antivirus ML false positives
+if(MINGW AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_custom_command(TARGET LuaPatcher POST_BUILD
+        COMMAND strip $<TARGET_FILE:LuaPatcher>
+        COMMENT "Stripping executable to bypass Windows Defender ML heuristics..."
+    )
+endif()
