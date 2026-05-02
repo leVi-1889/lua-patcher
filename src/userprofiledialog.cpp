@@ -12,6 +12,7 @@
 #include <QEasingCurve>
 #include <QFileDialog>
 #include <QBuffer>
+#include <QGraphicsOpacityEffect>
 
 UserProfileDialog::UserProfileDialog(const QString& targetUsername, const QString& myUsername, 
                                      QNetworkAccessManager* netMgr, QWidget* parent)
@@ -41,7 +42,8 @@ void UserProfileDialog::setupUI() {
     container->setObjectName("profileContainer");
     container->setStyleSheet(
         "QWidget#profileContainer {"
-        "  background: #0D1117;" // Theme black
+        "  background: #000000;" 
+        "  border: 1px solid white;"
         "  border-radius: 20px;"
         "  border: 1px solid rgba(255,255,255,0.08);"
         "}"
@@ -331,7 +333,6 @@ QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& 
     QWidget* tile = new QWidget();
     tile->setFixedSize(130, 195);
     tile->setStyleSheet("background:transparent;");
-    tile->setToolTip(name);
     tile->installEventFilter(this); // To catch hover events
     
     QVBoxLayout* tl = new QVBoxLayout(tile);
@@ -357,7 +358,11 @@ QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& 
     );
     nameLabel->setWordWrap(true);
     nameLabel->setAlignment(Qt::AlignCenter);
-    nameLabel->hide(); // Hidden by default, shown on hover
+    
+    QGraphicsOpacityEffect* opacityEff = new QGraphicsOpacityEffect(nameLabel);
+    opacityEff->setOpacity(0.0);
+    nameLabel->setGraphicsEffect(opacityEff);
+    nameLabel->show(); // Visible but opacity is 0
     
     // Load thumbnail (with fallback)
     QNetworkReply* imgReply = m_netMgr->get(QNetworkRequest(QUrl(thumbUrl)));
@@ -704,13 +709,31 @@ bool UserProfileDialog::eventFilter(QObject* obj, QEvent* event) {
         QWidget* tile = qobject_cast<QWidget*>(obj);
         if (tile) {
             QLabel* overlay = tile->findChild<QLabel*>("gameTitleOverlay");
-            if (overlay) overlay->show();
+            if (overlay) {
+                QGraphicsOpacityEffect* eff = qobject_cast<QGraphicsOpacityEffect*>(overlay->graphicsEffect());
+                if (eff) {
+                    QPropertyAnimation* anim = new QPropertyAnimation(eff, "opacity", tile);
+                    anim->setDuration(250); // Smooth fade in
+                    anim->setStartValue(eff->opacity());
+                    anim->setEndValue(1.0);
+                    anim->start(QAbstractAnimation::DeleteWhenStopped);
+                }
+            }
         }
     } else if (event->type() == QEvent::Leave) {
         QWidget* tile = qobject_cast<QWidget*>(obj);
         if (tile) {
             QLabel* overlay = tile->findChild<QLabel*>("gameTitleOverlay");
-            if (overlay) overlay->hide();
+            if (overlay) {
+                QGraphicsOpacityEffect* eff = qobject_cast<QGraphicsOpacityEffect*>(overlay->graphicsEffect());
+                if (eff) {
+                    QPropertyAnimation* anim = new QPropertyAnimation(eff, "opacity", tile);
+                    anim->setDuration(200); // Smooth fade out
+                    anim->setStartValue(eff->opacity());
+                    anim->setEndValue(0.0);
+                    anim->start(QAbstractAnimation::DeleteWhenStopped);
+                }
+            }
         }
     }
     return QDialog::eventFilter(obj, event);
