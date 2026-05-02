@@ -330,7 +330,7 @@ void UserProfileDialog::rebuildGamesGrid(QLayout* layout, const QJsonArray& game
 QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& name, const QString& thumbUrl, const QString& category) {
     QWidget* tile = new QWidget();
     tile->setFixedSize(130, 195);
-    tile->setStyleSheet("background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);");
+    tile->setStyleSheet("background:transparent;");
     tile->setToolTip(name);
     tile->installEventFilter(this); // To catch hover events
     
