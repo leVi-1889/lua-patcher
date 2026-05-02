@@ -329,8 +329,8 @@ void UserProfileDialog::rebuildGamesGrid(QLayout* layout, const QJsonArray& game
 
 QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& name, const QString& thumbUrl, const QString& category) {
     QWidget* tile = new QWidget();
-    tile->setFixedSize(130, 195); // Perfect fit for 3 columns in 500px width
-    tile->setStyleSheet("background:rgba(255,255,255,0.03); border-radius:6px; border:1px solid rgba(255,255,255,0.06);");
+    tile->setFixedSize(130, 195);
+    tile->setStyleSheet("background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);");
     tile->setToolTip(name);
     tile->installEventFilter(this); // To catch hover events
     
@@ -340,8 +340,8 @@ QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& 
     
     // Thumbnail (vertical)
     QLabel* thumb = new QLabel();
-    thumb->setFixedSize(130, 195); // Full height for hover effect
-    thumb->setStyleSheet("border-radius:6px; background:rgba(0,0,0,0.5); border:none;");
+    thumb->setFixedSize(130, 195);
+    thumb->setStyleSheet("background:rgba(0,0,0,0.5); border:none;");
     thumb->setScaledContents(true);
     tl->addWidget(thumb);
     
