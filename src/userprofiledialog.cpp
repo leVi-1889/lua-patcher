@@ -353,7 +353,6 @@ QWidget* UserProfileDialog::createGameTile(const QString& appId, const QString& 
         "QLabel#gameTitleOverlay {"
         "  color: white; font-size: 11px; font-weight: 800; "
         "  padding: 4px; background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0,0,0,0), stop:1 rgba(0,0,0,0.9));"
-        "  border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;"
         "}"
     );
     nameLabel->setWordWrap(true);
