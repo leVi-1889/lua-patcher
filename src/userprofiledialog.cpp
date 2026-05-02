@@ -129,7 +129,7 @@ void UserProfileDialog::setupUI() {
     
     // --- GAMES I PLAY CARD ---
     QWidget* playedCard = new QWidget();
-    playedCard->setStyleSheet("background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:12px;");
+    playedCard->setStyleSheet("background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04);");
     QVBoxLayout* pcl = new QVBoxLayout(playedCard);
     pcl->setContentsMargins(16, 12, 16, 12);
     
@@ -164,7 +164,7 @@ void UserProfileDialog::setupUI() {
     
     // --- GAMES IN ROTATION CARD ---
     QWidget* rotCard = new QWidget();
-    rotCard->setStyleSheet("background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:12px;");
+    rotCard->setStyleSheet("background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04);");
     QVBoxLayout* rcl = new QVBoxLayout(rotCard);
     rcl->setContentsMargins(16, 12, 16, 12);
     

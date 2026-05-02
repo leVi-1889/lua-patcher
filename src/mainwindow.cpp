@@ -1483,8 +1483,8 @@ void MainWindow::displayRandomGames() {
         nameLbl->setMaximumWidth(700);
         heroLayout->addWidget(nameLbl);
         
-        // Description - one to two lines of context
-        QLabel* descLbl = new QLabel("Experience high-performance community patches, optimized performance tweaks, and the latest trending features for your favorite games.");
+        // Description - fetched dynamically from Steam API
+        QLabel* descLbl = new QLabel(QString("Discover community patches and enhancements for %1.").arg(featuredName));
         descLbl->setStyleSheet(
             "font-size: 16px; font-weight: 500; color: rgba(255, 255, 255, 180); background: transparent; border: none;"
             " font-family: 'Segoe UI'; margin-top: 8px; margin-bottom: 2px;"
@@ -1492,6 +1492,27 @@ void MainWindow::displayRandomGames() {
         descLbl->setWordWrap(true);
         descLbl->setMaximumWidth(650);
         heroLayout->addWidget(descLbl);
+        
+        // Fetch real description from Steam Store API
+        QPointer<QLabel> safeDesc(descLbl);
+        QString descUrl = QString("https://store.steampowered.com/api/appdetails?appids=%1&l=english").arg(featuredId);
+        QNetworkReply* descReply = m_networkManager->get(QNetworkRequest(QUrl(descUrl)));
+        connect(descReply, &QNetworkReply::finished, this, [safeDesc, descReply, featuredId]() {
+            descReply->deleteLater();
+            if (!safeDesc || descReply->error() != QNetworkReply::NoError) return;
+            
+            QJsonDocument doc = QJsonDocument::fromJson(descReply->readAll());
+            QJsonObject appData = doc.object()[featuredId].toObject()["data"].toObject();
+            QString shortDesc = appData["short_description"].toString();
+            
+            if (!shortDesc.isEmpty() && safeDesc) {
+                // Truncate to ~120 chars for a clean 2-line display
+                if (shortDesc.length() > 120) {
+                    shortDesc = shortDesc.left(117) + "...";
+                }
+                safeDesc->setText(shortDesc);
+            }
+        });
         
         // Subtitle with App ID
         QLabel* subtitleLbl = new QLabel(QString("App ID: %1").arg(featuredId));
