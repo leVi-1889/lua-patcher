@@ -436,6 +436,12 @@ void UserProfileDialog::onEditClicked() {
 }
 
 void UserProfileDialog::onSaveClicked() {
+    // Emit avatar signal NOW (synchronously) before the dialog closes,
+    // because the async network reply may arrive after the dialog is deleted.
+    if (!m_newAvatarB64.isEmpty()) {
+        emit avatarUpdated(m_newAvatarB64);
+    }
+    
     saveProfile();
     m_isEditing = false;
     if (m_editBtn) m_editBtn->show();
