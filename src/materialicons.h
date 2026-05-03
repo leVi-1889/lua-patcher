@@ -34,6 +34,15 @@ public:
         Notifications
     };
 
+    static QPixmap getPixmap(Icon icon, int size, const QColor& color) {
+        QPixmap pixmap(size, size);
+        pixmap.fill(Qt::transparent);
+        QPainter p(&pixmap);
+        p.setRenderHint(QPainter::Antialiasing);
+        draw(p, QRectF(0, 0, size, size), color, icon);
+        return pixmap;
+    }
+
     static void draw(QPainter& p, const QRectF& rect, const QColor& color, Icon icon) {
 #ifdef HAS_QT_SVG
         // Premium SVG rendering path

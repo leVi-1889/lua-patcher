@@ -970,15 +970,24 @@ void MainWindow::initUI() {
     m_mainScrollLayout->setSpacing(10);
     
     // 1. Hero Stack — holds up to 4 trending games, shows exactly one at a time
-    m_leadingTitlesLabel = new QLabel("<span style='color: #ffffff;'>TRENDING</span>");
-    m_leadingTitlesLabel->setStyleSheet("font-size: 24px; font-weight: 800; padding-left: 0px; margin-bottom: 8px; font-family: 'Oswald', sans-serif;");
+    QWidget* trendingHeader = new QWidget();
+    QHBoxLayout* trendLay = new QHBoxLayout(trendingHeader);
+    trendLay->setContentsMargins(0, 0, 0, 8);
+    trendLay->setSpacing(8);
+    QLabel* trendIcon = new QLabel();
+    trendIcon->setPixmap(MaterialIcons::getPixmap(MaterialIcons::Flash, 28, QColor(255, 255, 255)));
+    m_leadingTitlesLabel = new QLabel("<span style='color: #ffffff;'>TRENDING TITLES</span>");
+    m_leadingTitlesLabel->setStyleSheet("font-size: 24px; font-weight: 800; padding-left: 0px; font-family: 'Oswald', sans-serif;");
+    trendLay->addWidget(trendIcon);
+    trendLay->addWidget(m_leadingTitlesLabel);
+    trendLay->addStretch();
     
     m_heroStack = new QStackedWidget();
     m_heroStack->setFixedHeight(320);
     m_heroStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_heroStack->setStyleSheet("background: transparent; border: none; border-radius: 25px;");
     
-    m_mainScrollLayout->addWidget(m_leadingTitlesLabel, 0, Qt::AlignLeft);
+    m_mainScrollLayout->addWidget(trendingHeader, 0, Qt::AlignLeft);
     m_mainScrollLayout->addWidget(m_heroStack);
     
     // Pagination indicators (Steam-style bars)
@@ -1019,6 +1028,13 @@ void MainWindow::initUI() {
     m_gridHeaderWidget = new QWidget();
     QHBoxLayout* gridHeaderLayout = new QHBoxLayout(m_gridHeaderWidget);
     gridHeaderLayout->setContentsMargins(0, 0, 0, 0);
+
+    gridHeaderLayout->setSpacing(8);
+
+    QLabel* gridIcon = new QLabel();
+    gridIcon->setPixmap(MaterialIcons::getPixmap(MaterialIcons::Gamepad, 28, QColor(255, 255, 255)));
+    gridIcon->setStyleSheet("margin-bottom: 8px;");
+    gridHeaderLayout->addWidget(gridIcon, 0, Qt::AlignBottom);
 
     m_gridTitleLabel = new QLabel("<span style='color: #ffffff;'>GAME STORE</span>");
     m_gridTitleLabel->setStyleSheet("font-size: 24px; font-weight: 800; padding-left: 0px; margin-bottom: 8px; font-family: 'Oswald', sans-serif;");
@@ -2317,8 +2333,6 @@ void MainWindow::runGenerateLogic() {
 }
 
 void MainWindow::doRestart() {
-    if (QMessageBox::question(this, "Restart Steam?", "Close Steam and all games?",
-                              QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) return;
     m_restartWorker = new RestartWorker(this);
     connect(m_restartWorker, &RestartWorker::finished, m_statusLabel, &QLabel::setText);
     m_restartWorker->start();
