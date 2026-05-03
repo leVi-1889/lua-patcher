@@ -221,7 +221,7 @@ MainWindow::MainWindow(QWidget* parent)
     // ── Enable Transparency for Desktop Blur ──
     setAttribute(Qt::WA_TranslucentBackground);
     
-    QString iconPath = Paths::getResourcePath("logo.ico");
+    QString iconPath = Paths::getResourcePath("icon.ico");
     if (QFile::exists(iconPath)) {
         setWindowIcon(QIcon(iconPath));
     }
@@ -771,7 +771,7 @@ void MainWindow::initUI() {
     
     QLabel* appIconLabel = new QLabel();
     appIconLabel->setFixedSize(36, 36);
-    QString iconPath = Paths::getResourcePath("logo.ico");
+    QString iconPath = Paths::getResourcePath("icon.ico");
     if (QFile::exists(iconPath)) {
         QPixmap logoPixmap(iconPath);
         appIconLabel->setPixmap(logoPixmap.scaled(36, 36, Qt::KeepAspectRatio, Qt::SmoothTransformation));

@@ -24,7 +24,7 @@ CustomTitleBar::CustomTitleBar(QWidget* parent)
     // App Icon & Title
     m_appIconLabel = new QLabel();
     m_appIconLabel->setFixedSize(20, 20);
-    QString iconPath = Paths::getResourcePath("logo.ico");
+    QString iconPath = Paths::getResourcePath("icon.ico");
     if (QFile::exists(iconPath)) {
         QPixmap logoPixmap(iconPath);
         m_appIconLabel->setPixmap(logoPixmap.scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));

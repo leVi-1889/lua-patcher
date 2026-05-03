@@ -30,7 +30,7 @@ else()
 endif()
 
 # Copy logo.ico to the build directory so it can be found at runtime
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/logo.ico" "${CMAKE_BINARY_DIR}/logo.ico" COPYONLY)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/icon.ico" "${CMAKE_BINARY_DIR}/icon.ico" COPYONLY)
 
 # Source files
 set(SOURCES

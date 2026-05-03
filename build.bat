@@ -52,7 +52,7 @@ echo Creating distribution...
 cd ..
 mkdir dist
 copy build\LuaPatcher.exe dist\
-copy logo.ico dist\ 2>nul
+copy icon.ico dist\ 2>nul
 
 REM Deploy Qt dependencies
 echo Deploying Qt dependencies...
