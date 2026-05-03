@@ -252,7 +252,7 @@ void GameDetailsPage::buildUI() {
         "  font-size: 14px; font-weight: bold; color: #EFECE3;"
         "  background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);"
         "  border-radius: 18px; padding: 6px 16px;"
-        "  font-family: 'Segoe UI';"
+        "  font-family: 'Cossette Texte', sans-serif;"
         "}"
         "QPushButton:hover {"
         "  background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25);"
@@ -280,7 +280,7 @@ void GameDetailsPage::buildUI() {
     m_heroTitleLabel = new QLabel("");
     m_heroTitleLabel->setStyleSheet(
         "font-size: 42px; font-weight: 800; color: #FFFFFF;"
-        "font-family: 'Segoe UI'; letter-spacing: -1px;"
+        "font-family: 'Cossette Texte', sans-serif; letter-spacing: -1px;"
         "background: transparent;"
     );
     m_heroTitleLabel->setWordWrap(true);
@@ -309,7 +309,7 @@ void GameDetailsPage::buildUI() {
     m_installButton->setStyleSheet(
         "QPushButton {"
         "  background: #00E676; color: #000000; font-weight: 800; font-size: 16px;"
-        "  border-radius: 14px; font-family: 'Segoe UI'; border: none;"
+        "  border-radius: 14px; font-family: 'Cossette Texte', sans-serif; border: none;"
         "  letter-spacing: 1px;"
         "}"
         "QPushButton:hover {"
@@ -336,7 +336,7 @@ void GameDetailsPage::buildUI() {
         "QPushButton {"
         "  background: transparent; color: #EFECE3; font-weight: 600; font-size: 14px;"
         "  border: 1px solid rgba(255,255,255,0.25); border-radius: 14px;"
-        "  font-family: 'Segoe UI';"
+        "  font-family: 'Cossette Texte', sans-serif;"
         "}"
         "QPushButton:hover {"
         "  background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.4);"
@@ -378,7 +378,7 @@ void GameDetailsPage::buildUI() {
     QLabel* aboutTitle = new QLabel("ABOUT THIS GAME");
     aboutTitle->setStyleSheet(
         "font-size: 13px; font-weight: 700; color: #8FABD4;"
-        "font-family: 'Segoe UI'; letter-spacing: 2px;"
+        "font-family: 'Cossette Texte', sans-serif; letter-spacing: 2px;"
         "background: transparent;"
     );
     descCol->addWidget(aboutTitle);
@@ -387,7 +387,7 @@ void GameDetailsPage::buildUI() {
     m_descriptionLabel->setWordWrap(true);
     m_descriptionLabel->setStyleSheet(
         "font-size: 14px; color: #EFECE3; line-height: 1.6;"
-        "font-family: 'Segoe UI'; background: transparent;"
+        "font-family: 'Cossette Texte', sans-serif; background: transparent;"
     );
     m_descriptionLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     descCol->addWidget(m_descriptionLabel);
@@ -410,7 +410,7 @@ void GameDetailsPage::buildUI() {
     QLabel* specsTitle = new QLabel("SPECIFICATIONS");
     specsTitle->setStyleSheet(
         "font-size: 12px; font-weight: 700; color: #8FABD4;"
-        "font-family: 'Segoe UI'; letter-spacing: 2px;"
+        "font-family: 'Cossette Texte', sans-serif; letter-spacing: 2px;"
         "border: none; background: transparent;"
     );
     m_specsLayout->addWidget(specsTitle);
@@ -434,7 +434,7 @@ void GameDetailsPage::buildUI() {
     QLabel* ssTitle = new QLabel("GAME PREVIEWS");
     ssTitle->setStyleSheet(
         "font-size: 13px; font-weight: 700; color: #8FABD4;"
-        "font-family: 'Segoe UI'; letter-spacing: 2px;"
+        "font-family: 'Cossette Texte', sans-serif; letter-spacing: 2px;"
         "background: transparent;"
     );
     ssMainLayout->addWidget(ssTitle);
@@ -450,7 +450,7 @@ void GameDetailsPage::buildUI() {
     btnPrev->setStyleSheet(
         "QPushButton { background: rgba(20,20,30,0.8); color: #EFECE3;"
         "  font-size: 22px; font-weight: bold; border-radius: 18px;"
-        "  border: 1px solid rgba(143,171,212,0.15); font-family: 'Segoe UI'; }"
+        "  border: 1px solid rgba(143,171,212,0.15); font-family: 'Cossette Texte', sans-serif; }"
         "QPushButton:hover { background: rgba(143,171,212,0.2); }"
     );
 
@@ -522,7 +522,7 @@ void GameDetailsPage::buildUI() {
     QLabel* fTitle = new QLabel("GAME FEATURES");
     fTitle->setStyleSheet(
         "font-size: 14px; font-weight: 900; color: #EFECE3;"
-        "font-family: 'Segoe UI'; letter-spacing: 2px;"
+        "font-family: 'Cossette Texte', sans-serif; letter-spacing: 2px;"
         "border: none; background: transparent;"
     );
     m_featuresLayout->addWidget(fTitle);
@@ -555,7 +555,7 @@ void GameDetailsPage::buildUI() {
     QLabel* secTitle = new QLabel("SECURITY");
     secTitle->setStyleSheet(
         "font-size: 14px; font-weight: 900; color: #EFECE3;"
-        "font-family: 'Segoe UI'; letter-spacing: 2px;"
+        "font-family: 'Cossette Texte', sans-serif; letter-spacing: 2px;"
         "border: none; background: transparent;"
     );
     m_securityLayout->addWidget(secTitle);
@@ -782,7 +782,7 @@ void GameDetailsPage::loadGame(const QString& appId, const QString& name, bool s
     m_installButton->setStyleSheet(
         "QPushButton {"
         "  background: #00E676; color: #000000; font-weight: 800; font-size: 16px;"
-        "  border-radius: 14px; font-family: 'Segoe UI'; border: none;"
+        "  border-radius: 14px; font-family: 'Cossette Texte', sans-serif; border: none;"
         "  letter-spacing: 1px;"
         "}"
         "QPushButton:hover {"
@@ -880,7 +880,7 @@ void GameDetailsPage::populate(const QJsonObject& data) {
         pill->setStyleSheet(
             "background: rgba(255,255,255,0.12);"
             "color: #EFECE3; font-size: 11px; font-weight: 600;"
-            "font-family: 'Segoe UI';"
+            "font-family: 'Cossette Texte', sans-serif;"
             "padding: 4px 14px; border-radius: 12px;"
         );
         pill->setFixedHeight(24);
@@ -905,7 +905,7 @@ void GameDetailsPage::populate(const QJsonObject& data) {
         QLabel* keyLabel = new QLabel(key);
         keyLabel->setStyleSheet(
             "font-size: 11px; color: #8FABD4; font-weight: 600;"
-            "font-family: 'Segoe UI'; letter-spacing: 1px;"
+            "font-family: 'Cossette Texte', sans-serif; letter-spacing: 1px;"
             "background: transparent; border: none;"
         );
         rowLayout->addWidget(keyLabel);
@@ -913,7 +913,7 @@ void GameDetailsPage::populate(const QJsonObject& data) {
         QLabel* valLabel = new QLabel(value);
         valLabel->setStyleSheet(
             "font-size: 14px; color: #EFECE3; font-weight: 700;"
-            "font-family: 'Segoe UI';"
+            "font-family: 'Cossette Texte', sans-serif;"
             "background: transparent; border: none;"
         );
         valLabel->setWordWrap(true);
@@ -1077,7 +1077,7 @@ void GameDetailsPage::populate(const QJsonObject& data) {
         hl->addWidget(iconLbl);
 
         QLabel* textLbl = new QLabel(text);
-        textLbl->setStyleSheet("background: transparent; color: #EFECE3; font-size: 12px; font-weight: 600; border: none; font-family: 'Segoe UI';");
+        textLbl->setStyleSheet("background: transparent; color: #EFECE3; font-size: 12px; font-weight: 600; border: none; font-family: 'Cossette Texte', sans-serif;");
         hl->addWidget(textLbl, 1);
         return pod;
     };
@@ -1148,7 +1148,7 @@ void GameDetailsPage::installFinished() {
     m_installButton->setStyleSheet(
         "QPushButton {"
         "  background: rgba(0,230,118,0.2); color: #00E676; font-weight: 800; font-size: 16px;"
-        "  border-radius: 14px; font-family: 'Segoe UI'; border: 1px solid rgba(0,230,118,0.4);"
+        "  border-radius: 14px; font-family: 'Cossette Texte', sans-serif; border: 1px solid rgba(0,230,118,0.4);"
         "  letter-spacing: 1px;"
         "}"
     );
@@ -1162,7 +1162,7 @@ void GameDetailsPage::installError(const QString& err) {
     m_installButton->setStyleSheet(
         "QPushButton {"
         "  background: #D32F2F; color: white; font-weight: 800; font-size: 16px;"
-        "  border-radius: 14px; font-family: 'Segoe UI'; border: none;"
+        "  border-radius: 14px; font-family: 'Cossette Texte', sans-serif; border: none;"
         "  letter-spacing: 1px;"
         "}"
         "QPushButton:hover {"

@@ -17,7 +17,7 @@ QMainWindow {
 }
 
 QWidget {
-    font-family: 'Roboto', 'Segoe UI', sans-serif;
+    font-family: 'Cossette Texte', sans-serif;
     color: %2;
 }
 
@@ -91,7 +91,7 @@ QMessageBox {
 }
 QMessageBox QLabel {
     color: %2;
-    font-family: 'Roboto', 'Segoe UI', sans-serif;
+    font-family: 'Cossette Texte', sans-serif;
 }
 QMessageBox QPushButton {
     background-color: %8;
@@ -100,7 +100,7 @@ QMessageBox QPushButton {
     padding: 8px 24px;
     border: none;
     font-weight: bold;
-    font-family: 'Roboto', 'Segoe UI', sans-serif;
+    font-family: 'Cossette Texte', sans-serif;
 }
 QMessageBox QPushButton:hover {
     background-color: %11;
@@ -113,7 +113,7 @@ QToolTip {
     border: 1px solid %3;
     border-radius: 8px;
     padding: 6px 12px;
-    font-family: 'Roboto', 'Segoe UI', sans-serif;
+    font-family: 'Cossette Texte', sans-serif;
 }
 )")
     .arg(Colors::SURFACE)                // %1  background
@@ -142,8 +142,7 @@ int main(int argc, char *argv[]) {
     app.setStyleSheet(getStyleSheet());
     
     qDebug() << "Step 4: Setting up fonts";
-    // Material Design font: Roboto (fallback Segoe UI)
-    QFont font("Roboto");
+    QFont font("Cossette Texte");
     if (!QFontInfo(font).exactMatch()) {
 #ifdef Q_OS_WIN
         font.setFamily("Segoe UI");

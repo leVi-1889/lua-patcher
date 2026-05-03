@@ -142,7 +142,7 @@ void GlassButton::paintEvent(QPaintEvent* event) {
         QColor textColor = QColor("#EFECE3");
         painter.setPen(textColor);
         
-        QFont titleFont("Segoe UI", 13, m_isActive ? QFont::Bold : QFont::Normal);
+        QFont titleFont("Cossette Texte", 13, QFont::Bold);
         titleFont.setStyleStrategy(QFont::PreferAntialias);
         painter.setFont(titleFont);
         
