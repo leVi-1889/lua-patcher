@@ -738,7 +738,7 @@ void MainWindow::initUI() {
     // ──── Material Navigation Rail (Sidebar) ────
     m_sidebarWidget = new QWidget(this);
     m_sidebarWidget->setObjectName("sidebar");
-    m_sidebarWidget->setFixedWidth(220);
+    m_sidebarWidget->setFixedWidth(240);
     m_sidebarWidget->setAttribute(Qt::WA_StyledBackground);
     m_sidebarWidget->setAutoFillBackground(false);
     m_sidebarWidget->setStyleSheet(QString(
@@ -786,7 +786,7 @@ void MainWindow::initUI() {
     
     m_appTitleLabel = new QLabel("Lua Patcher");
     m_appTitleLabel->setStyleSheet(QString(
-        "font-size: 20px; font-weight: 700; letter-spacing: -1px; color: %1; background: transparent; border: none; font-family: 'Cossette Texte', sans-serif;"
+        "font-size: 20px; font-weight: 700; letter-spacing: -1px; color: %1; background: transparent; border: none; font-family: 'Oswald', sans-serif;"
     ).arg(Colors::ON_SURFACE));
     headerLayout->addWidget(m_appTitleLabel);
     headerLayout->addStretch();
@@ -797,7 +797,7 @@ void MainWindow::initUI() {
     m_navTitleLabel = new QLabel("NAVIGATION");
     m_navTitleLabel->setStyleSheet(QString(
         "font-size: 10px; font-weight: 600; color: %1; letter-spacing: 1px;"
-        " background: transparent; border: none; padding-left: 4px; font-family: 'Cossette Texte', sans-serif;"
+        " background: transparent; border: none; padding-left: 4px; font-family: 'Oswald', sans-serif;"
     ).arg(Colors::OUTLINE));
     m_navTitleLabel->hide();
     sidebarInnerLayout->addWidget(m_navTitleLabel);
@@ -856,7 +856,7 @@ void MainWindow::initUI() {
     sidebarInnerLayout->addSpacing(8);
     
     m_infoTitleLabel = new QLabel(QString("v%1<br>by <a href=\"https://github.com/sayedalimollah2602-prog\" style=\"color: %2; text-decoration: none;\">leVI</a> & <a href=\"https://github.com/raxnmint\" style=\"color: %2; text-decoration: none;\">raxnmint</a>").arg(Config::APP_VERSION).arg(Colors::ON_SURFACE_VARIANT));
-    m_infoTitleLabel->setStyleSheet(QString("color: %1; font-size: 10px; font-weight: bold; font-family: 'Cossette Texte', sans-serif; background: transparent; border: none;").arg(Colors::ON_SURFACE_VARIANT));
+    m_infoTitleLabel->setStyleSheet(QString("color: %1; font-size: 10px; font-weight: bold; font-family: 'Oswald', sans-serif; background: transparent; border: none;").arg(Colors::ON_SURFACE_VARIANT));
     m_infoTitleLabel->setAlignment(Qt::AlignCenter);
     m_infoTitleLabel->setTextFormat(Qt::RichText);
     m_infoTitleLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
@@ -929,7 +929,7 @@ void MainWindow::initUI() {
         "color: white;"
         "font-size: 9px;"
         "font-weight: bold;"
-        "font-family: 'Cossette Texte', sans-serif;"
+        "font-family: 'Oswald', sans-serif;"
         "border-radius: 8px;"
         "border: none;"
     );
@@ -971,7 +971,7 @@ void MainWindow::initUI() {
     
     // 1. Hero Stack — holds up to 4 trending games, shows exactly one at a time
     m_leadingTitlesLabel = new QLabel("<span style='color: #ffffff;'>TRENDING</span>");
-    m_leadingTitlesLabel->setStyleSheet("font-size: 24px; font-weight: 800; padding-left: 0px; margin-bottom: 8px; font-family: 'Cossette Texte', sans-serif;");
+    m_leadingTitlesLabel->setStyleSheet("font-size: 24px; font-weight: 800; padding-left: 0px; margin-bottom: 8px; font-family: 'Oswald', sans-serif;");
     
     m_heroStack = new QStackedWidget();
     m_heroStack->setFixedHeight(320);
@@ -1021,7 +1021,7 @@ void MainWindow::initUI() {
     gridHeaderLayout->setContentsMargins(0, 0, 0, 0);
 
     m_gridTitleLabel = new QLabel("<span style='color: #ffffff;'>GAME STORE</span>");
-    m_gridTitleLabel->setStyleSheet("font-size: 24px; font-weight: 800; padding-left: 0px; margin-bottom: 8px; font-family: 'Cossette Texte', sans-serif;");
+    m_gridTitleLabel->setStyleSheet("font-size: 24px; font-weight: 800; padding-left: 0px; margin-bottom: 8px; font-family: 'Oswald', sans-serif;");
     gridHeaderLayout->addWidget(m_gridTitleLabel, 0, Qt::AlignBottom);
     gridHeaderLayout->addStretch();
 
@@ -1240,7 +1240,7 @@ void MainWindow::initUI() {
     m_topUsernameLabel = new QLabel(m_username.isEmpty() ? "User" : m_username);
     m_topUsernameLabel->setStyleSheet(
         "font-size: 14px; font-weight: 700; color: #EAEEF3;"
-        "background: transparent; font-family: 'Cossette Texte', sans-serif;"
+        "background: transparent; font-family: 'Oswald', sans-serif;"
         "letter-spacing: 0.3px;"
     );
     capsuleLayout->addWidget(m_topUsernameLabel);
@@ -1477,7 +1477,7 @@ void MainWindow::displayRandomGames() {
         QLabel* nameLbl = new QLabel(featuredName.toUpper());
         nameLbl->setStyleSheet(
             "font-size: 42px; font-weight: 900; color: #FFFFFF; background: transparent; border: none;"
-            " font-family: 'Cossette Texte', sans-serif; letter-spacing: -1px;"
+            " font-family: 'Oswald', sans-serif; letter-spacing: -1px;"
         );
         nameLbl->setWordWrap(true);
         nameLbl->setMaximumWidth(700);
@@ -1487,7 +1487,7 @@ void MainWindow::displayRandomGames() {
         QLabel* descLbl = new QLabel(QString("Discover community patches and enhancements for %1.").arg(featuredName));
         descLbl->setStyleSheet(
             "font-size: 16px; font-weight: 500; color: rgba(255, 255, 255, 180); background: transparent; border: none;"
-            " font-family: 'Cossette Texte', sans-serif; margin-top: 8px; margin-bottom: 2px;"
+            " font-family: 'Oswald', sans-serif; margin-top: 8px; margin-bottom: 2px;"
         );
         descLbl->setWordWrap(true);
         descLbl->setMaximumWidth(650);
@@ -1518,7 +1518,7 @@ void MainWindow::displayRandomGames() {
         QLabel* subtitleLbl = new QLabel(QString("App ID: %1").arg(featuredId));
         subtitleLbl->setStyleSheet(
             "font-size: 14px; font-weight: 500; color: #8FABD4; background: transparent; border: none;"
-            " font-family: 'Cossette Texte', sans-serif; margin-top: 6px;"
+            " font-family: 'Oswald', sans-serif; margin-top: 6px;"
         );
         heroLayout->addWidget(subtitleLbl);
         m_heroStack->addWidget(slide);

@@ -17,7 +17,7 @@ QMainWindow {
 }
 
 QWidget {
-    font-family: 'Cossette Texte', sans-serif;
+    font-family: 'Oswald', sans-serif;
     color: %2;
 }
 
@@ -91,7 +91,7 @@ QMessageBox {
 }
 QMessageBox QLabel {
     color: %2;
-    font-family: 'Cossette Texte', sans-serif;
+    font-family: 'Oswald', sans-serif;
 }
 QMessageBox QPushButton {
     background-color: %8;
@@ -100,7 +100,7 @@ QMessageBox QPushButton {
     padding: 8px 24px;
     border: none;
     font-weight: bold;
-    font-family: 'Cossette Texte', sans-serif;
+    font-family: 'Oswald', sans-serif;
 }
 QMessageBox QPushButton:hover {
     background-color: %11;
@@ -113,7 +113,7 @@ QToolTip {
     border: 1px solid %3;
     border-radius: 8px;
     padding: 6px 12px;
-    font-family: 'Cossette Texte', sans-serif;
+    font-family: 'Oswald', sans-serif;
 }
 )")
     .arg(Colors::SURFACE)                // %1  background
@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
     app.setStyleSheet(getStyleSheet());
     
     qDebug() << "Step 4: Setting up fonts";
-    QFont font("Cossette Texte");
+    QFont font("Oswald");
     if (!QFontInfo(font).exactMatch()) {
 #ifdef Q_OS_WIN
         font.setFamily("Segoe UI");

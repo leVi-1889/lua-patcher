@@ -293,7 +293,11 @@ void UserProfileDialog::rebuildGamesGrid(QLayout* layout, const QJsonArray& game
     // Clear existing
     while (layout->count() > 0) {
         QLayoutItem* item = layout->takeAt(0);
-        if (item->widget()) item->widget()->deleteLater();
+        if (item->widget()) {
+            item->widget()->removeEventFilter(this);
+            item->widget()->hide();
+            item->widget()->deleteLater();
+        }
         delete item;
     }
     
