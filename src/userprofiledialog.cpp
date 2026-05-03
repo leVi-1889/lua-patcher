@@ -423,8 +423,12 @@ void UserProfileDialog::removeGameFromList(const QString& appId, const QString& 
     }
     arr = newArr;
     
-    QLayout* layout = (category == "played") ? (QLayout*)m_playedGamesLayout : (QLayout*)m_rotationGamesLayout;
-    rebuildGamesGrid(layout, arr, category);
+    // Defer the rebuild so we're not destroying the tile mid-signal from its own child button
+    QTimer::singleShot(0, this, [this, category]() {
+        QJsonArray& games = (category == "played") ? m_playedGames : m_rotationGames;
+        QLayout* layout = (category == "played") ? (QLayout*)m_playedGamesLayout : (QLayout*)m_rotationGamesLayout;
+        rebuildGamesGrid(layout, games, category);
+    });
 }
 
 void UserProfileDialog::onEditClicked() {
