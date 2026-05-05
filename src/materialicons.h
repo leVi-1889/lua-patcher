@@ -336,6 +336,32 @@ private:
                     <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.9 16.3 5.3 13.5 4.6V4C13.5 3.2 12.8 2.5 12 2.5C11.2 2.5 10.5 3.2 10.5 4V4.6C7.7 5.3 6 7.9 6 11V16L4 18V19H20V18L18 16Z" fill="#8FABD4"/>
                 </svg>
             )SVG";
+            case Flash: return R"SVG(
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="gradFlash" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#FFD700" />
+                            <stop offset="100%" stop-color="#FF8C00" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M13 2L4 14h7v8l9-12h-7V2z" fill="url(#gradFlash)"/>
+                </svg>
+            )SVG";
+            case Gamepad: return R"SVG(
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="gradGamepad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#EFECE3" />
+                            <stop offset="100%" stop-color="#A8DB8F" />
+                        </linearGradient>
+                    </defs>
+                    <rect x="2" y="6" width="20" height="12" rx="6" fill="url(#gradGamepad)"/>
+                    <rect x="5" y="10.5" width="5" height="3" fill="#1A1C23" rx="1"/>
+                    <rect x="6.5" y="9" width="2" height="6" fill="#1A1C23" rx="1"/>
+                    <circle cx="16" cy="13.5" r="1.5" fill="#1A1C23"/>
+                    <circle cx="18" cy="10.5" r="1.5" fill="#1A1C23"/>
+                </svg>
+            )SVG";
             default: return R"SVG(
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="4" y="4" width="16" height="16" rx="4" fill="#EFECE3" opacity="0.3"/>
