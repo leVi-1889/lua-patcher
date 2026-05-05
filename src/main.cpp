@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
     qDebug() << "Step 2: Creating QApplication";
     QApplication app(argc, argv);
     qDebug() << "Step 3: Setting icon and style";
-    app.setWindowIcon(QIcon("icon.ico"));
+    app.setWindowIcon(QIcon("icon.png"));
     app.setStyle("Fusion");
     app.setStyleSheet(getStyleSheet());
     
