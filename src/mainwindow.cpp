@@ -448,7 +448,9 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
                 
                 connect(dlg, &UserProfileDialog::avatarUpdated, this, [this](const QString& b64) {
                     m_userData["avatar_url"] = b64;
-                    QSettings settings("LuaPatcher", "Client");
+                    QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+                    QString settingsPath = appDataPath + "/settings.ini";
+                    QSettings settings(settingsPath, QSettings::IniFormat);
                     settings.setValue("userData", QJsonDocument(m_userData).toJson());
                     updateSidebarAvatar();
                 });
@@ -2681,7 +2683,10 @@ void MainWindow::setInitialUser(const QString& username, const QJsonObject& data
         // Start Notification Polling Timer (every 30 seconds)
         if (!m_notifTimer) {
             m_notifTimer = new QTimer(this);
-            connect(m_notifTimer, &QTimer::timeout, this, &MainWindow::fetchNotificationCount);
+            connect(m_notifTimer, &QTimer::timeout, this, [this]() {
+                fetchNotificationCount();
+                refreshFriendsList();
+            });
             m_notifTimer->start(30000); // 30 seconds
             fetchNotificationCount(); // Fetch immediately
         }
