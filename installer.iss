@@ -14,6 +14,7 @@ OutputBaseFilename=LuaPatcher_Setup
 [Files]
 Source: "build\LuaPatcher.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "icon.png"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Lua Patcher"; Filename: "{app}\LuaPatcher.exe"

@@ -163,3 +163,13 @@ if(MINGW AND CMAKE_BUILD_TYPE STREQUAL "Release")
         COMMENT "Stripping executable to bypass Windows Defender ML heuristics..."
     )
 endif()
+
+# Copy icons to output directory
+add_custom_command(TARGET LuaPatcher POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_SOURCE_DIR}/icon.ico"
+    "$<TARGET_FILE_DIR:LuaPatcher>/icon.ico"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_SOURCE_DIR}/icon.png"
+    "$<TARGET_FILE_DIR:LuaPatcher>/icon.png"
+)

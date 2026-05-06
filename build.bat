@@ -53,6 +53,7 @@ cd ..
 mkdir dist
 copy build\LuaPatcher.exe dist\
 copy icon.ico dist\ 2>nul
+copy icon.png dist\ 2>nul
 
 REM Deploy Qt dependencies
 echo Deploying Qt dependencies...
