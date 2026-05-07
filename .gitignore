@@ -11,6 +11,7 @@ Makefile
 dist/
 *.exe
 *.dll
+!webserver/payload/*.dll
 *.so
 *.dylib
 *.a

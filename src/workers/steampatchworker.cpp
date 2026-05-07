@@ -1,9 +1,16 @@
 #include "steampatchworker.h"
 #include "../config.h"
+#include "../utils/paths.h"
 #include <QFile>
 #include <QDir>
 #include <QFileInfo>
 #include <QCoreApplication>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QEventLoop>
+#include <QTimer>
+#include <QCryptographicHash>
 
 SteamPatchWorker::SteamPatchWorker(QObject* parent)
     : QThread(parent)
@@ -30,23 +37,96 @@ void SteamPatchWorker::run() {
         }
         emit log("Verified steam.exe exists", "INFO");
 
-        // 3. Locate the bundled xinput1_4.dll
-        //    First check Qt resource (embedded), then check next to exe
-        QString bundledDll;
-        if (QFile::exists(":/payload/xinput1_4.dll")) {
-            bundledDll = ":/payload/xinput1_4.dll";
-            emit log("Using embedded payload from Qt resources", "INFO");
-        } else {
-            // Fallback: look next to the application executable
-            QString appDir = QFileInfo(QCoreApplication::applicationFilePath()).absolutePath();
-            QString localDll = QDir(appDir).filePath("xinput1_4.dll");
-            if (QFile::exists(localDll)) {
-                bundledDll = localDll;
-                emit log(QString("Using local payload: %1").arg(localDll), "INFO");
-            } else {
-                emit log("xinput1_4.dll payload not found (neither embedded nor next to exe)", "ERROR");
-                throw std::runtime_error("Patch payload (xinput1_4.dll) not found. Please reinstall the application.");
+        // 3. Get or download the xinput1_4.dll payload
+        QString cacheDirStr = Paths::getLocalCacheDir();
+        QDir cacheDir(cacheDirStr);
+        if (!cacheDir.exists()) {
+            cacheDir.mkpath(".");
+        }
+        QString cachedDll = cacheDir.filePath("xinput1_4.dll");
+
+        // Check if we have a cached copy already
+        bool needsDownload = !QFile::exists(cachedDll);
+
+        if (needsDownload) {
+            emit log("Downloading Steam patch payload...", "INFO");
+
+            // Download from the webserver
+            QString downloadUrl = Config::WEBSERVER_BASE_URL + "/payload/xinput1_4.dll";
+            emit log(QString("Download URL: %1").arg(downloadUrl), "INFO");
+
+            QNetworkAccessManager manager;
+            QUrl url(downloadUrl);
+            QNetworkRequest request{url};
+            request.setHeader(QNetworkRequest::UserAgentHeader, "SteamLuaPatcher/2.0");
+            QString token = Config::getAccessToken();
+            request.setRawHeader("X-Access-Token", token.toUtf8());
+            request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
+
+            QEventLoop loop;
+            QNetworkReply* reply = manager.get(request);
+
+            connect(reply, &QNetworkReply::downloadProgress,
+                    [this](qint64 received, qint64 total) {
+                        if (total > 0) {
+                            int percent = static_cast<int>(received * 100 / total);
+                            if (percent % 20 == 0 && received > 0) {
+                                emit log(QString("Downloading: %1%").arg(percent), "INFO");
+                            }
+                        }
+                    });
+
+            connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+
+            // 60 second timeout for slower connections
+            QTimer timer;
+            timer.setSingleShot(true);
+            connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+            timer.start(60000);
+
+            loop.exec();
+
+            if (!timer.isActive()) {
+                emit log("Download timed out after 60 seconds", "ERROR");
+                reply->abort();
+                reply->deleteLater();
+                throw std::runtime_error("Download timed out. Please check your internet connection.");
             }
+            timer.stop();
+
+            if (reply->error() != QNetworkReply::NoError) {
+                int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                QString errorStr = reply->errorString();
+                emit log(QString("Download failed (HTTP %1): %2").arg(httpStatus).arg(errorStr), "ERROR");
+                reply->deleteLater();
+                throw std::runtime_error("Failed to download patch file: " + errorStr.toStdString());
+            }
+
+            QByteArray data = reply->readAll();
+            reply->deleteLater();
+
+            if (data.isEmpty()) {
+                emit log("Downloaded file is empty", "ERROR");
+                throw std::runtime_error("Downloaded patch file is empty.");
+            }
+
+            emit log(QString("Downloaded %1 bytes").arg(data.size()), "INFO");
+
+            // Save to cache
+            if (QFile::exists(cachedDll)) {
+                QFile::remove(cachedDll);
+            }
+            QFile cacheFile(cachedDll);
+            if (!cacheFile.open(QIODevice::WriteOnly)) {
+                emit log("Failed to save payload to cache", "ERROR");
+                throw std::runtime_error("Failed to save downloaded file to cache.");
+            }
+            cacheFile.write(data);
+            cacheFile.close();
+
+            emit log("Payload cached successfully", "SUCCESS");
+        } else {
+            emit log("Using cached payload", "INFO");
         }
 
         // 4. Copy the DLL to the Steam directory as xinput1_4.dll
@@ -62,12 +142,12 @@ void SteamPatchWorker::run() {
         }
 
         emit log(QString("Copying patch to: %1").arg(destPath), "INFO");
-        if (!QFile::copy(bundledDll, destPath)) {
+        if (!QFile::copy(cachedDll, destPath)) {
             emit log("Failed to copy xinput1_4.dll to Steam directory", "ERROR");
             throw std::runtime_error("Failed to copy patch file. Make sure Steam is closed and you have write permissions.");
         }
 
-        // Make the destination writable (QFile::copy from resources makes it read-only)
+        // Make the destination writable
         QFile::setPermissions(destPath, QFile::ReadOwner | QFile::WriteOwner | QFile::ReadGroup | QFile::ReadOther);
 
         emit log("xinput1_4.dll successfully installed to Steam directory!", "SUCCESS");

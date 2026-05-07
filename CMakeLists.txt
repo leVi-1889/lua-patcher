@@ -89,11 +89,6 @@ if(BUILD_STATIC)
     list(APPEND SOURCES src/static_plugins.cpp)
 endif()
 
-# Qt Resources (embeds xinput1_4.dll payload)
-set(RESOURCES
-    resources.qrc
-)
-
 # Create executable
 if(WIN32 AND APP_ICON_RESOURCE_WINDOWS)
     # Compile icon resource separately to avoid autogen include issues
@@ -103,9 +98,9 @@ if(WIN32 AND APP_ICON_RESOURCE_WINDOWS)
         AUTOUIC OFF 
         AUTORCC OFF
     )
-    add_executable(LuaPatcher WIN32 ${SOURCES} ${HEADERS} ${RESOURCES} $<TARGET_OBJECTS:AppIcon>)
+    add_executable(LuaPatcher WIN32 ${SOURCES} ${HEADERS} $<TARGET_OBJECTS:AppIcon>)
 else()
-    add_executable(LuaPatcher ${SOURCES} ${HEADERS} ${RESOURCES})
+    add_executable(LuaPatcher ${SOURCES} ${HEADERS})
 endif()
 
 # Link Qt libraries

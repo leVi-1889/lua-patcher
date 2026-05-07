@@ -103,6 +103,16 @@ def serve_lua(filename):
         abort(404)
     return Response(content, mimetype='text/plain')
 
+@app.route('/payload/<filename>')
+@require_token
+def serve_payload(filename):
+    """Serve binary payload files (e.g. xinput1_4.dll for Steam patching)"""
+    payload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'payload')
+    file_path = os.path.join(payload_dir, filename)
+    if not os.path.exists(file_path):
+        abort(404)
+    return send_file(file_path, mimetype='application/octet-stream', as_attachment=True, download_name=filename)
+
 # --- User & Social System (Supabase) ---
 
 @app.route('/api/user/check/<username>')
