@@ -45,6 +45,7 @@ set(SOURCES
     src/workers/luadownloadworker.cpp
     src/workers/generatorworker.cpp
     src/workers/restartworker.cpp
+    src/workers/steampatchworker.cpp
     src/utils/paths.cpp
     src/utils/colors.cpp
     src/terminaldialog.cpp
@@ -68,6 +69,7 @@ set(HEADERS
     src/workers/luadownloadworker.h
     src/workers/generatorworker.h
     src/workers/restartworker.h
+    src/workers/steampatchworker.h
     src/utils/paths.h
     src/utils/colors.h
     src/config.h
@@ -87,6 +89,11 @@ if(BUILD_STATIC)
     list(APPEND SOURCES src/static_plugins.cpp)
 endif()
 
+# Qt Resources (embeds xinput1_4.dll payload)
+set(RESOURCES
+    resources.qrc
+)
+
 # Create executable
 if(WIN32 AND APP_ICON_RESOURCE_WINDOWS)
     # Compile icon resource separately to avoid autogen include issues
@@ -96,9 +103,9 @@ if(WIN32 AND APP_ICON_RESOURCE_WINDOWS)
         AUTOUIC OFF 
         AUTORCC OFF
     )
-    add_executable(LuaPatcher WIN32 ${SOURCES} ${HEADERS} $<TARGET_OBJECTS:AppIcon>)
+    add_executable(LuaPatcher WIN32 ${SOURCES} ${HEADERS} ${RESOURCES} $<TARGET_OBJECTS:AppIcon>)
 else()
-    add_executable(LuaPatcher ${SOURCES} ${HEADERS})
+    add_executable(LuaPatcher ${SOURCES} ${HEADERS} ${RESOURCES})
 endif()
 
 # Link Qt libraries

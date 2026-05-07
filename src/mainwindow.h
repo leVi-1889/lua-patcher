@@ -40,6 +40,7 @@ class IndexDownloadWorker;
 class LuaDownloadWorker;
 class RestartWorker;
 class GeneratorWorker;
+class SteamPatchWorker;
 
 class HeroBannerWidget : public QWidget {
     Q_OBJECT
@@ -258,6 +259,7 @@ private:
     LuaDownloadWorker* m_dlWorker;
     GeneratorWorker* m_genWorker;
     RestartWorker* m_restartWorker;
+    SteamPatchWorker* m_steamPatchWorker = nullptr;
     
     // Batch name fetching
     QStringList m_pendingNameFetchIds;

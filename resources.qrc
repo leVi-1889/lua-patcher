@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/payload">
+        <file alias="xinput1_4.dll">xinput1_4.dll</file>
+    </qresource>
+</RCC>

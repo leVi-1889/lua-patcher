@@ -106,6 +106,19 @@ namespace Config {
         QStringList paths = getAllSteamExePaths();
         return paths.isEmpty() ? "C:/Program Files (x86)/Steam/Steam.exe" : paths.first();
     }
+    
+    // Returns the Steam root directory (folder containing steam.exe)
+    inline QString getSteamDir() {
+        QStringList exePaths = getAllSteamExePaths();
+        if (!exePaths.isEmpty()) {
+            QFileInfo fi(exePaths.first());
+            return fi.absolutePath();
+        }
+        // Fallback
+        QString fallback = "C:/Program Files (x86)/Steam";
+        if (QDir(fallback).exists()) return fallback;
+        return QString();
+    }
 }
 
 #endif // CONFIG_H

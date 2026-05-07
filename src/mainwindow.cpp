@@ -15,6 +15,7 @@
 #include "workers/luadownloadworker.h"
 #include "workers/generatorworker.h"
 #include "workers/restartworker.h"
+#include "workers/steampatchworker.h"
 #include "utils/colors.h"
 #include "utils/gameinfo.h"
 #include "terminaldialog.h"
@@ -1130,6 +1131,136 @@ void MainWindow::initUI() {
     });
     pathLayout->addWidget(browseBtn);
     settingsLayout->addLayout(pathLayout);
+    settingsLayout->addSpacing(30);
+    
+    // ── Steam Patch Section ──
+    QLabel* patchSectionLabel = new QLabel("Steam Patch");
+    patchSectionLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: white;");
+    settingsLayout->addWidget(patchSectionLabel);
+    settingsLayout->addSpacing(8);
+    
+    QLabel* patchDescLabel = new QLabel(
+        "Install the Steam unlock patch directly. This places the required file into your "
+        "Steam directory so games and DLCs can be unlocked without needing a separate tool.");
+    patchDescLabel->setStyleSheet("color: rgba(255,255,255,120); font-size: 13px;");
+    patchDescLabel->setWordWrap(true);
+    settingsLayout->addWidget(patchDescLabel);
+    settingsLayout->addSpacing(12);
+    
+    // Status label for patch
+    QLabel* patchStatusLabel = new QLabel("");
+    patchStatusLabel->setStyleSheet("color: rgba(255,255,255,140); font-size: 13px;");
+    patchStatusLabel->setWordWrap(true);
+    patchStatusLabel->hide();
+    
+    // Check current patch status
+    QString steamDir = Config::getSteamDir();
+    bool alreadyPatched = false;
+    if (!steamDir.isEmpty()) {
+        QString existingDll = QDir(steamDir).filePath("xinput1_4.dll");
+        alreadyPatched = QFile::exists(existingDll);
+    }
+    
+    GlassButton* patchBtn = new GlassButton(
+        MaterialIcons::Flash, 
+        alreadyPatched ? " Re-Patch Steam" : " Patch Steam", 
+        "", 
+        alreadyPatched ? Colors::OUTLINE : "#2ECC71"
+    );
+    patchBtn->setFixedHeight(44);
+    
+    // Unpatch button
+    GlassButton* unpatchBtn = new GlassButton(MaterialIcons::Delete, " Remove Patch", "", "#E74C3C");
+    unpatchBtn->setFixedHeight(44);
+    unpatchBtn->setVisible(alreadyPatched);
+    
+    connect(patchBtn, &QPushButton::clicked, this, [this, patchBtn, unpatchBtn, patchStatusLabel]() {
+        patchBtn->setEnabled(false);
+        patchBtn->setText(" Patching...");
+        patchStatusLabel->setStyleSheet("color: rgba(255,255,255,140); font-size: 13px;");
+        patchStatusLabel->setText("Starting Steam patch...");
+        patchStatusLabel->show();
+        
+        m_steamPatchWorker = new SteamPatchWorker(this);
+        QPointer<MainWindow> guard(this);
+        QPointer<GlassButton> safePatchBtn(patchBtn);
+        QPointer<GlassButton> safeUnpatchBtn(unpatchBtn);
+        QPointer<QLabel> safeStatus(patchStatusLabel);
+        
+        connect(m_steamPatchWorker, &SteamPatchWorker::log, this, [safeStatus](QString msg, QString level) {
+            if (!safeStatus) return;
+            if (level == "ERROR") {
+                safeStatus->setStyleSheet("color: #E74C3C; font-size: 13px;");
+            } else if (level == "SUCCESS") {
+                safeStatus->setStyleSheet("color: #2ECC71; font-size: 13px;");
+            } else {
+                safeStatus->setStyleSheet("color: rgba(255,255,255,140); font-size: 13px;");
+            }
+            safeStatus->setText(msg);
+        });
+        
+        connect(m_steamPatchWorker, &SteamPatchWorker::finished, this, [guard, safePatchBtn, safeUnpatchBtn, safeStatus](QString msg) {
+            if (!guard) return;
+            if (safePatchBtn) {
+                safePatchBtn->setEnabled(true);
+                safePatchBtn->setText(" Re-Patch Steam");
+            }
+            if (safeUnpatchBtn) safeUnpatchBtn->setVisible(true);
+            if (safeStatus) {
+                safeStatus->setStyleSheet("color: #2ECC71; font-size: 13px; font-weight: bold;");
+                safeStatus->setText(msg);
+            }
+        });
+        
+        connect(m_steamPatchWorker, &SteamPatchWorker::error, this, [guard, safePatchBtn, safeStatus](QString err) {
+            if (!guard) return;
+            if (safePatchBtn) {
+                safePatchBtn->setEnabled(true);
+                safePatchBtn->setText(" Patch Steam");
+            }
+            if (safeStatus) {
+                safeStatus->setStyleSheet("color: #E74C3C; font-size: 13px;");
+                safeStatus->setText("Error: " + err);
+            }
+        });
+        
+        connect(m_steamPatchWorker, &QThread::finished, m_steamPatchWorker, &QObject::deleteLater);
+        m_steamPatchWorker->start();
+    });
+    
+    connect(unpatchBtn, &QPushButton::clicked, this, [this, patchBtn, unpatchBtn, patchStatusLabel]() {
+        QString steamDir = Config::getSteamDir();
+        if (steamDir.isEmpty()) {
+            patchStatusLabel->setStyleSheet("color: #E74C3C; font-size: 13px;");
+            patchStatusLabel->setText("Steam directory not found.");
+            patchStatusLabel->show();
+            return;
+        }
+        QString dllPath = QDir(steamDir).filePath("xinput1_4.dll");
+        if (QFile::exists(dllPath)) {
+            if (QFile::remove(dllPath)) {
+                patchStatusLabel->setStyleSheet("color: #2ECC71; font-size: 13px; font-weight: bold;");
+                patchStatusLabel->setText("Patch removed successfully. Restart Steam.");
+                patchBtn->setText(" Patch Steam");
+                unpatchBtn->setVisible(false);
+            } else {
+                patchStatusLabel->setStyleSheet("color: #E74C3C; font-size: 13px;");
+                patchStatusLabel->setText("Failed to remove patch. Close Steam first.");
+            }
+        } else {
+            patchStatusLabel->setText("No patch found to remove.");
+            unpatchBtn->setVisible(false);
+        }
+        patchStatusLabel->show();
+    });
+    
+    QHBoxLayout* patchBtnLayout = new QHBoxLayout();
+    patchBtnLayout->addWidget(patchBtn);
+    patchBtnLayout->addWidget(unpatchBtn);
+    patchBtnLayout->addStretch();
+    settingsLayout->addLayout(patchBtnLayout);
+    settingsLayout->addSpacing(4);
+    settingsLayout->addWidget(patchStatusLabel);
     settingsLayout->addSpacing(30);
     
     // Logout Button
