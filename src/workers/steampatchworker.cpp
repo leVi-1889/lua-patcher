@@ -51,17 +51,14 @@ void SteamPatchWorker::run() {
         if (needsDownload) {
             emit log("Downloading Steam patch payload...", "INFO");
 
-            // Download from the webserver
-            QString downloadUrl = Config::WEBSERVER_BASE_URL + "/payload/xinput1_4.dll";
+            // Download from GitHub Raw instead of Vercel to avoid serverless payload limits
+            QString downloadUrl = "https://raw.githubusercontent.com/devsayed2602/luapatcher/main/webserver/payload/xinput1_4.dll";
             emit log(QString("Download URL: %1").arg(downloadUrl), "INFO");
 
             QNetworkAccessManager manager;
             QUrl url(downloadUrl);
             QNetworkRequest request{url};
             request.setHeader(QNetworkRequest::UserAgentHeader, "SteamLuaPatcher/2.0");
-            QString token = Config::getAccessToken();
-            request.setRawHeader("X-Access-Token", token.toUtf8());
-            request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
 
             QEventLoop loop;
             QNetworkReply* reply = manager.get(request);
