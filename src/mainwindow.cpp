@@ -1910,7 +1910,7 @@ void MainWindow::startSync() {
     // Always start background sync to get fresh data
     m_syncWorker = new IndexDownloadWorker(this);
     connect(m_syncWorker, &IndexDownloadWorker::finished, this, &MainWindow::onSyncDone);
-    connect(m_syncWorker, &IndexDownloadWorker::progress, [this](QString msg) {
+    connect(m_syncWorker, &IndexDownloadWorker::progress, this, [this](QString msg) {
         // Only show sync progress if we don't already have cached data displayed
         if (!m_hasCachedData) m_statusLabel->setText(msg);
     });
@@ -2351,7 +2351,7 @@ void MainWindow::runPatchLogic() {
     
     m_dlWorker = new LuaDownloadWorker(m_selectedGame["appid"], this);
     connect(m_dlWorker, &LuaDownloadWorker::finished, this, &MainWindow::onPatchDone);
-    connect(m_dlWorker, &LuaDownloadWorker::progress, [this](qint64 dl, qint64 total) {
+    connect(m_dlWorker, &LuaDownloadWorker::progress, this, [this](qint64 dl, qint64 total) {
         if (total > 0) {
             int pct = static_cast<int>(dl * 100 / total);
             m_progress->setValue(pct);
@@ -2360,7 +2360,7 @@ void MainWindow::runPatchLogic() {
             }
         }
     });
-    connect(m_dlWorker, &LuaDownloadWorker::status, [this](QString msg) { m_statusLabel->setText(msg); });
+    connect(m_dlWorker, &LuaDownloadWorker::status, this, [this](QString msg) { m_statusLabel->setText(msg); });
     connect(m_dlWorker, &LuaDownloadWorker::error, this, &MainWindow::onPatchError);
     m_dlWorker->start();
 }
@@ -2450,7 +2450,7 @@ void MainWindow::runGenerateLogic() {
             }
         }
     });
-    connect(m_genWorker, &GeneratorWorker::progress, [this](qint64 dl, qint64 total) {
+    connect(m_genWorker, &GeneratorWorker::progress, this, [this](qint64 dl, qint64 total) {
         if (total > 0) {
             int pct = static_cast<int>(dl * 100 / total);
             m_progress->setValue(pct);
@@ -2459,7 +2459,7 @@ void MainWindow::runGenerateLogic() {
             }
         }
     });
-    connect(m_genWorker, &GeneratorWorker::status, [this](QString msg) { m_statusLabel->setText(msg); });
+    connect(m_genWorker, &GeneratorWorker::status, this, [this](QString msg) { m_statusLabel->setText(msg); });
     connect(m_genWorker, &GeneratorWorker::log, m_terminalDialog, &TerminalDialog::appendLog);
     connect(m_genWorker, &GeneratorWorker::error, this, &MainWindow::onPatchError);
     m_genWorker->start();
