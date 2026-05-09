@@ -2823,6 +2823,14 @@ void MainWindow::setInitialUser(const QString& username, const QJsonObject& data
         }
     }
     updateSidebarAvatar();
+    
+    // Check if initial setup is needed
+    QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    QString settingsPath = appDataPath + "/settings.ini";
+    QSettings settings(settingsPath, QSettings::IniFormat);
+    if (!settings.value("initial_setup_done", false).toBool()) {
+        runInitialSetup();
+    }
 }
 
 void MainWindow::sendHeartbeat() {
@@ -3248,3 +3256,92 @@ void MainWindow::checkAppUpdate() {
     });
 }
 
+void MainWindow::runInitialSetup() {
+    QWidget* overlay = new QWidget(this);
+    overlay->setStyleSheet("background-color: rgba(10, 10, 15, 240);");
+    overlay->setGeometry(rect());
+    overlay->show();
+
+    QVBoxLayout* layout = new QVBoxLayout(overlay);
+    layout->setAlignment(Qt::AlignCenter);
+
+    QLabel* title = new QLabel("Setting up your Steam Environment", overlay);
+    title->setStyleSheet("font-size: 28px; font-weight: bold; color: white; background: transparent;");
+    title->setAlignment(Qt::AlignCenter);
+
+    QLabel* status = new QLabel("Initializing...", overlay);
+    status->setStyleSheet("font-size: 16px; color: #A8DB8F; background: transparent; margin-top: 20px;");
+    status->setAlignment(Qt::AlignCenter);
+
+    LoadingSpinner* spinner = new LoadingSpinner(overlay);
+    spinner->setFixedSize(60, 60);
+
+    layout->addStretch();
+    layout->addWidget(title, 0, Qt::AlignCenter);
+    layout->addSpacing(30);
+    layout->addWidget(spinner, 0, Qt::AlignCenter);
+    layout->addWidget(status, 0, Qt::AlignCenter);
+    layout->addStretch();
+
+    overlay->raise();
+    overlay->installEventFilter(this); // Intercept events so user can't click through
+
+    status->setText("Optimizing Steam Auto-Start...");
+    QCoreApplication::processEvents();
+
+    // 1. Remove standard Registry Run Key
+    QSettings reg("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
+    reg.remove("Steam");
+
+    // 2. Create shortcut in Startup folder with correct Working Directory
+    QString psScript = 
+        "$WshShell = New-Object -comObject WScript.Shell;"
+        "$Shortcut = $WshShell.CreateShortcut([Environment]::GetFolderPath('Startup') + '\\Steam.lnk');"
+        "$Shortcut.TargetPath = 'C:\\Program Files (x86)\\Steam\\steam.exe';"
+        "$Shortcut.Arguments = '-silent';"
+        "$Shortcut.WorkingDirectory = 'C:\\Program Files (x86)\\Steam';"
+        "$Shortcut.Save();";
+        
+    QProcess* ps = new QProcess(this);
+    ps->start("powershell", QStringList() << "-NoProfile" << "-Command" << psScript);
+    ps->waitForFinished();
+    ps->deleteLater();
+
+    // 3. Patch Steam Payload
+    status->setText("Installing Steam DRM Patch payload...");
+    QCoreApplication::processEvents();
+
+    if (!m_steamPatchWorker) {
+        m_steamPatchWorker = new SteamPatchWorker(this);
+    }
+    
+    // Disconnect old connections to prevent duplicates
+    m_steamPatchWorker->disconnect();
+    
+    connect(m_steamPatchWorker, &SteamPatchWorker::log, this, [status](QString msg, QString level) {
+        status->setText(msg);
+    });
+    
+    connect(m_steamPatchWorker, &SteamPatchWorker::finished, this, [this, overlay]() {
+        QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+        QString settingsPath = appDataPath + "/settings.ini";
+        QSettings settings(settingsPath, QSettings::IniFormat);
+        settings.setValue("initial_setup_done", true);
+        
+        overlay->deleteLater();
+    });
+    
+    connect(m_steamPatchWorker, &SteamPatchWorker::error, this, [status](QString errorMsg) {
+        status->setText("Error: " + errorMsg);
+        status->setStyleSheet("color: #F2B8B5; font-size: 16px; background: transparent; margin-top: 10px;");
+        
+        // Even if payload patch fails, let them proceed after a delay
+        QTimer::singleShot(3000, status, [status]() {
+            if (status && status->parentWidget()) {
+                status->parentWidget()->deleteLater();
+            }
+        });
+    });
+    
+    m_steamPatchWorker->start();
+}
