@@ -22,7 +22,7 @@ void RestartWorker::run() {
         // Restart Steam
         QString steamExe = Config::getSteamExePath();
         if (QFile::exists(steamExe)) {
-            QProcess::startDetached(steamExe, QStringList());
+            QProcess::startDetached(steamExe, QStringList() << "-startupwait");
             emit finished("Steam launched!");
         } else {
             QProcess::startDetached("cmd", QStringList() << "/c" << "start" << "steam://open/main");
