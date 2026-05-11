@@ -13,7 +13,6 @@ public:
 signals:
     void finished(QString message);
     void error(QString errorMessage);
-    void log(QString message, QString level);
 
 protected:
     void run() override;
