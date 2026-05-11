@@ -2466,8 +2466,21 @@ void MainWindow::runGenerateLogic() {
 }
 
 void MainWindow::doRestart() {
+    m_terminalDialog->clear();
+    m_terminalDialog->appendLog("Starting Steam restart sequence...", "INFO");
+    m_terminalDialog->show();
+
     m_restartWorker = new RestartWorker(this);
-    connect(m_restartWorker, &RestartWorker::finished, m_statusLabel, &QLabel::setText);
+    connect(m_restartWorker, &RestartWorker::log, m_terminalDialog, &TerminalDialog::appendLog);
+    connect(m_restartWorker, &RestartWorker::finished, this, [this](QString msg) {
+        m_statusLabel->setText(msg);
+        m_terminalDialog->setFinished(true);
+    });
+    connect(m_restartWorker, &RestartWorker::error, this, [this](QString err) {
+        m_statusLabel->setText("Restart failed: " + err);
+        m_terminalDialog->appendLog(err, "ERROR");
+        m_terminalDialog->setFinished(false);
+    });
     m_restartWorker->start();
 }
 
@@ -3294,12 +3307,14 @@ void MainWindow::runInitialSetup() {
     reg.remove("Steam");
 
     // 2. Create shortcut in Startup folder with correct Working Directory
+    QString steamExePath = Config::getSteamExePath().replace('/', '\\');
+    QString steamDirPath = Config::getSteamDir().replace('/', '\\');
     QString psScript = 
         "$WshShell = New-Object -comObject WScript.Shell;"
         "$Shortcut = $WshShell.CreateShortcut([Environment]::GetFolderPath('Startup') + '\\Steam.lnk');"
-        "$Shortcut.TargetPath = 'C:\\Program Files (x86)\\Steam\\steam.exe';"
-        "$Shortcut.Arguments = '-startupwait';"
-        "$Shortcut.WorkingDirectory = 'C:\\Program Files (x86)\\Steam';"
+        "$Shortcut.TargetPath = '" + steamExePath + "';"
+        "$Shortcut.Arguments = '-silent';"
+        "$Shortcut.WorkingDirectory = '" + steamDirPath + "';"
         "$Shortcut.Save();";
         
     QProcess* ps = new QProcess(this);
