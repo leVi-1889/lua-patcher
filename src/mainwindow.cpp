@@ -3313,7 +3313,7 @@ void MainWindow::runInitialSetup() {
         "$WshShell = New-Object -comObject WScript.Shell;"
         "$Shortcut = $WshShell.CreateShortcut([Environment]::GetFolderPath('Startup') + '\\Steam.lnk');"
         "$Shortcut.TargetPath = '" + steamExePath + "';"
-        "$Shortcut.Arguments = '-silent';"
+        "$Shortcut.Arguments = '-startupwait';"
         "$Shortcut.WorkingDirectory = '" + steamDirPath + "';"
         "$Shortcut.Save();";
         
