@@ -5,6 +5,8 @@
 #include <QFile>
 #include <QDir>
 #include <QFileInfo>
+#include <QSettings>
+#include "../utils/paths.h"
 
 RestartWorker::RestartWorker(QObject* parent)
     : QThread(parent)
@@ -45,6 +47,15 @@ void RestartWorker::run() {
             QThread::sleep(1);
         }
         
+        // Force kill any remaining lingerers
+        if (!allClosed) {
+            emit log("Some processes lingering. Force terminating...", "WARNING");
+            for (const QString& proc : steamProcesses) {
+                QProcess::execute("taskkill.exe", QStringList() << "/F" << "/IM" << proc << "/T");
+            }
+            QThread::sleep(2);
+        }
+
         // 2. CRITICAL: Clear the ActiveProcess and session state
         // This prevents the new Steam instance from thinking an old one is still running.
         emit log("Clearing Steam session state and cache...", "INFO");
