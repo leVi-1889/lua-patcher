@@ -3,6 +3,7 @@
 #include "onboardingdialog.h"
 #include "workers/restartworker.h"
 #include <QApplication>
+#include <QProcess>
 #include <QThread>
 #include <QEventLoop>
 #include <QFont>
