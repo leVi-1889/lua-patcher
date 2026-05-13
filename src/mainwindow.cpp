@@ -3302,18 +3302,18 @@ void MainWindow::runInitialSetup() {
     status->setText("Optimizing Steam Auto-Start...");
     QCoreApplication::processEvents();
 
-    // 1. Remove standard Registry Run Key
+    // 1. Remove standard Registry Run Key (Steam keeps re-creating this with wrong CWD)
     QSettings reg("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
     reg.remove("Steam");
 
-    // 2. Create shortcut in Startup folder with correct Working Directory
+    // 2. Create Steam shortcut in Startup folder with correct Working Directory
     QString steamExePath = Config::getSteamExePath().replace('/', '\\');
     QString steamDirPath = Config::getSteamDir().replace('/', '\\');
     QString psScript = 
         "$WshShell = New-Object -comObject WScript.Shell;"
         "$Shortcut = $WshShell.CreateShortcut([Environment]::GetFolderPath('Startup') + '\\Steam.lnk');"
         "$Shortcut.TargetPath = '" + steamExePath + "';"
-        "$Shortcut.Arguments = '-startupwait';"
+        "$Shortcut.Arguments = '-silent';"
         "$Shortcut.WorkingDirectory = '" + steamDirPath + "';"
         "$Shortcut.Save();";
         
@@ -3321,6 +3321,26 @@ void MainWindow::runInitialSetup() {
     ps->start("powershell", QStringList() << "-NoProfile" << "-Command" << psScript);
     ps->waitForFinished();
     ps->deleteLater();
+
+    // 3. Create LuaPatcher auto-fix shortcut in Startup folder
+    // This is the safety net: even if Steam re-adds its own broken auto-start,
+    // LuaPatcher will run silently with --auto-fix, wait for Steam to start,
+    // then restart it with the correct working directory.
+    QString luaPatcherExe = QCoreApplication::applicationFilePath().replace('/', '\\');
+    QString luaPatcherDir = QCoreApplication::applicationDirPath().replace('/', '\\');
+    QString psScript2 = 
+        "$WshShell = New-Object -comObject WScript.Shell;"
+        "$Shortcut = $WshShell.CreateShortcut([Environment]::GetFolderPath('Startup') + '\\LuaPatcher AutoFix.lnk');"
+        "$Shortcut.TargetPath = '" + luaPatcherExe + "';"
+        "$Shortcut.Arguments = '--auto-fix';"
+        "$Shortcut.WorkingDirectory = '" + luaPatcherDir + "';"
+        "$Shortcut.WindowStyle = 7;"  // 7 = Minimized/Hidden
+        "$Shortcut.Save();";
+        
+    QProcess* ps2 = new QProcess(this);
+    ps2->start("powershell", QStringList() << "-NoProfile" << "-Command" << psScript2);
+    ps2->waitForFinished();
+    ps2->deleteLater();
 
     // 3. Patch Steam Payload
     status->setText("Installing Steam DRM Patch payload...");
