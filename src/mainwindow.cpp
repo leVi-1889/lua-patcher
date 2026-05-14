@@ -26,6 +26,8 @@
 #include <QProcess>
 #include <QApplication>
 #include <QImageWriter>
+#include <QTextStream>
+#include <QDir>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -3347,31 +3349,39 @@ void MainWindow::runInitialSetup() {
     status->setText("Optimizing Steam Shortcuts...");
     QCoreApplication::processEvents();
     
-    QString psScript3 = QString(
-        "$WshShell = New-Object -comObject WScript.Shell;"
-        "$desktop = [Environment]::GetFolderPath('Desktop');"
-        "$startMenu = [Environment]::GetFolderPath('Programs');"
-        "$paths = @($desktop, $startMenu);"
-        "foreach ($path in $paths) {"
-        "    Get-ChildItem -Path $path -Filter '*Steam*.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {"
-        "        $shortcut = $WshShell.CreateShortcut($_.FullName);"
-        "        if ($shortcut.TargetPath -match 'steam\\.exe$') {"
-        "            $shortcut.TargetPath = '%1';"
-        "            $shortcut.Arguments = '--launch-steam';"
-        "            $shortcut.WorkingDirectory = '%2';"
-        "            $shortcut.IconLocation = '%3, 0';"
-        "            $shortcut.Save();"
-        "        }"
-        "    }"
-        "}")
-        .arg(luaPatcherExe)
-        .arg(luaPatcherDir)
-        .arg(steamExePath);
+    // Write a temp PowerShell script to avoid escaping issues with $ and %
+    QString tempScript = QDir::tempPath() + "/luapatcher_hijack.ps1";
+    QFile scriptFile(tempScript);
+    if (scriptFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&scriptFile);
+        out << "$WshShell = New-Object -ComObject WScript.Shell\n";
+        out << "$paths = @(\n";
+        out << "    [Environment]::GetFolderPath('Desktop'),\n";
+        out << "    [Environment]::GetFolderPath('Programs'),\n";
+        out << "    [Environment]::GetFolderPath('CommonDesktopDirectory'),\n";
+        out << "    [Environment]::GetFolderPath('CommonPrograms')\n";
+        out << ")\n";
+        out << "foreach ($path in $paths) {\n";
+        out << "    if (-not (Test-Path $path)) { continue }\n";
+        out << "    Get-ChildItem -Path $path -Filter '*Steam*.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {\n";
+        out << "        $shortcut = $WshShell.CreateShortcut($_.FullName)\n";
+        out << "        if ($shortcut.TargetPath -match 'steam\\.exe$') {\n";
+        out << "            $shortcut.TargetPath = '" << luaPatcherExe << "'\n";
+        out << "            $shortcut.Arguments = '--launch-steam'\n";
+        out << "            $shortcut.WorkingDirectory = '" << luaPatcherDir << "'\n";
+        out << "            $shortcut.IconLocation = '" << steamExePath << ", 0'\n";
+        out << "            $shortcut.Save()\n";
+        out << "        }\n";
+        out << "    }\n";
+        out << "}\n";
+        scriptFile.close();
+    }
 
     QProcess* ps3 = new QProcess(this);
-    ps3->start("powershell", QStringList() << "-NoProfile" << "-Command" << psScript3);
-    ps3->waitForFinished();
+    ps3->start("powershell", QStringList() << "-ExecutionPolicy" << "Bypass" << "-NoProfile" << "-File" << tempScript);
+    ps3->waitForFinished(15000);
     ps3->deleteLater();
+    QFile::remove(tempScript); // Clean up
 
     // 5. Patch Steam Payload
     status->setText("Installing Steam DRM Patch payload...");
