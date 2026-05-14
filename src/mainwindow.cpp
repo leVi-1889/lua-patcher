@@ -3342,7 +3342,38 @@ void MainWindow::runInitialSetup() {
     ps2->waitForFinished();
     ps2->deleteLater();
 
-    // 3. Patch Steam Payload
+    // 4. Hijack Desktop and Start Menu shortcuts
+    // This makes the "default startup" open via Lua Patcher's sanitization method
+    status->setText("Optimizing Steam Shortcuts...");
+    QCoreApplication::processEvents();
+    
+    QString psScript3 = QString(
+        "$WshShell = New-Object -comObject WScript.Shell;"
+        "$desktop = [Environment]::GetFolderPath('Desktop');"
+        "$startMenu = [Environment]::GetFolderPath('Programs');"
+        "$paths = @($desktop, $startMenu);"
+        "foreach ($path in $paths) {"
+        "    Get-ChildItem -Path $path -Filter '*Steam*.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {"
+        "        $shortcut = $WshShell.CreateShortcut($_.FullName);"
+        "        if ($shortcut.TargetPath -match 'steam\\.exe$') {"
+        "            $shortcut.TargetPath = '%1';"
+        "            $shortcut.Arguments = '--launch-steam';"
+        "            $shortcut.WorkingDirectory = '%2';"
+        "            $shortcut.IconLocation = '%3, 0';"
+        "            $shortcut.Save();"
+        "        }"
+        "    }"
+        "}")
+        .arg(luaPatcherExe)
+        .arg(luaPatcherDir)
+        .arg(steamExePath);
+
+    QProcess* ps3 = new QProcess(this);
+    ps3->start("powershell", QStringList() << "-NoProfile" << "-Command" << psScript3);
+    ps3->waitForFinished();
+    ps3->deleteLater();
+
+    // 5. Patch Steam Payload
     status->setText("Installing Steam DRM Patch payload...");
     QCoreApplication::processEvents();
 

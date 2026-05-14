@@ -189,6 +189,20 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    // Direct Launch mode (For replacing Desktop Shortcuts)
+    if (argc > 1 && QString(argv[1]) == "--launch-steam") {
+        qDebug() << "Direct Launch mode: Sanitizing and starting Steam...";
+        
+        RestartWorker* worker = new RestartWorker();
+        QEventLoop loop;
+        QObject::connect(worker, &RestartWorker::finished, &loop, &QEventLoop::quit);
+        QObject::connect(worker, &RestartWorker::error, &loop, &QEventLoop::quit);
+        worker->start();
+        loop.exec();
+        
+        return 0; // Exit silently after launching
+    }
+
     qDebug() << "Step 4: Setting up fonts";
     QFont font("Oswald");
     if (!QFontInfo(font).exactMatch()) {
