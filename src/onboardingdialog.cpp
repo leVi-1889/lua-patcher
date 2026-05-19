@@ -17,16 +17,14 @@
 #include <QKeyEvent>
 #include <cmath>
 
-OnboardingDialog::OnboardingDialog(QWidget* parent)
-    : QDialog(parent)
-    , m_currentMode(LOGIN)
-    , m_isAvailable(false)
-    , m_isChecking(false)
-    , m_isGuest(false)
-    , m_isLoading(false)
-    , m_loadingProgress(0.0f)
-    , m_loadingTime(0.0f)
-    , m_loadingStage(0)
+// ============================================================================
+// SLEEK MODULAR LOADING WIDGET IMPLEMENTATION
+// ============================================================================
+LoadingWidget::LoadingWidget(QWidget* parent)
+    : QWidget(parent)
+    , m_progress(0.0f)
+    , m_time(0.0f)
+    , m_stage(0)
     , m_textOpacity(1.0f)
     , m_statusText("verifying details")
     , m_authReply(nullptr)
@@ -35,7 +33,310 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
     , m_patchWorker(nullptr)
     , m_patchCompleted(false)
     , m_patchSuccess(false)
-    , m_loadingError("")
+    , m_errorMsg("")
+{
+    m_networkManager = new QNetworkAccessManager(this);
+    m_animationTimer = new QTimer(this);
+    connect(m_animationTimer, &QTimer::timeout, this, &LoadingWidget::onUpdate);
+
+    // Load tool logo icon
+    QString iconPath = QCoreApplication::applicationDirPath() + "/icon.png";
+    if (!QFile::exists(iconPath)) {
+        iconPath = "icon.png";
+    }
+    m_logoPixmap.load(iconPath);
+}
+
+LoadingWidget::~LoadingWidget() {
+    stop();
+}
+
+void LoadingWidget::start(const QString& username, const QString& password, bool isRegister, bool isGuest) {
+    m_inputUsername = username;
+    m_inputPassword = password;
+    m_isRegister = isRegister;
+    m_isGuest = isGuest;
+    m_progress = 0.0f;
+    m_time = 0.0f;
+    m_stage = 0;
+    m_textOpacity = 1.0f;
+    m_statusText = "verifying details";
+    m_authCompleted = false;
+    m_authSuccess = false;
+    m_patchCompleted = false;
+    m_patchSuccess = false;
+    m_errorMsg = "";
+
+    m_animationTimer->start(16);
+    m_elapsedTimer.start();
+
+    if (m_isGuest) {
+        m_authCompleted = true;
+        m_authSuccess = true;
+        m_verifiedUsername = "Guest";
+        m_stage = 1;
+        m_statusText = "patching steam";
+        startPatching();
+    } else {
+        startAuth();
+    }
+}
+
+void LoadingWidget::stop() {
+    m_animationTimer->stop();
+    if (m_authReply) {
+        m_authReply->abort();
+        m_authReply->deleteLater();
+        m_authReply = nullptr;
+    }
+}
+
+void LoadingWidget::startAuth() {
+    QString endpoint = m_isRegister ? "/api/user/register" : "/api/user/login";
+    QNetworkRequest req(QUrl(Config::WEBSERVER_BASE_URL + endpoint));
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QJsonObject body;
+    body["username"] = m_inputUsername;
+    body["password"] = m_inputPassword;
+
+    m_authReply = m_networkManager->post(req, QJsonDocument(body).toJson());
+    connect(m_authReply, &QNetworkReply::finished, this, &LoadingWidget::onAuthFinished);
+}
+
+void LoadingWidget::onAuthFinished() {
+    if (!m_authReply) return;
+    m_authReply->deleteLater();
+
+    QByteArray responseData = m_authReply->readAll();
+    QJsonObject obj = QJsonDocument::fromJson(responseData).object();
+
+    if (m_authReply->error() == QNetworkReply::NoError && obj["success"].toBool()) {
+        m_userData = obj["user"].toObject();
+        m_verifiedUsername = m_userData["username"].toString();
+        m_authSuccess = true;
+        m_authCompleted = true;
+        
+        // Start patching steam as soon as authentication finishes successfully
+        startPatching();
+    } else {
+        m_authSuccess = false;
+        m_authCompleted = true;
+
+        QString errorMsg = "Auth failed";
+        if (!obj["error"].toString().isEmpty()) {
+            errorMsg = obj["error"].toString();
+        } else if (m_authReply->error() != QNetworkReply::NoError) {
+            errorMsg = m_authReply->errorString();
+        } else if (m_authReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
+            errorMsg = "Invalid username or password";
+        }
+        
+        m_errorMsg = errorMsg;
+        stop();
+        emit failed(errorMsg);
+    }
+    m_authReply = nullptr;
+}
+
+void LoadingWidget::startPatching() {
+    m_patchWorker = new SteamPatchWorker(this);
+    connect(m_patchWorker, &SteamPatchWorker::log, this, &LoadingWidget::onPatchLog);
+    connect(m_patchWorker, &SteamPatchWorker::finished, this, &LoadingWidget::onPatchFinished);
+    connect(m_patchWorker, &SteamPatchWorker::error, this, &LoadingWidget::onPatchError);
+    connect(m_patchWorker, &QThread::finished, m_patchWorker, &QObject::deleteLater);
+    m_patchWorker->start();
+}
+
+void LoadingWidget::onPatchLog(const QString& msg, const QString& level) {
+    qDebug() << "[Loader Widget]" << level << ":" << msg;
+}
+
+void LoadingWidget::onPatchFinished(const QString&) {
+    m_patchSuccess = true;
+    m_patchCompleted = true;
+}
+
+void LoadingWidget::onPatchError(const QString& err) {
+    m_patchSuccess = false;
+    m_patchCompleted = true;
+    m_errorMsg = "Steam patch failed: " + err;
+    stop();
+    emit failed(m_errorMsg);
+}
+
+void LoadingWidget::onUpdate() {
+    float deltaTime = m_elapsedTimer.restart() / 1000.0f;
+    if (deltaTime > 0.1f) deltaTime = 0.1f;
+
+    m_time += deltaTime;
+
+    // Progress sequencing
+    if (m_stage == 0) {
+        if (m_progress < 0.50f) {
+            m_progress += deltaTime * 0.20f;
+            if (m_progress > 0.50f) m_progress = 0.50f;
+        }
+        if (m_authCompleted && m_authSuccess && m_progress >= 0.50f) {
+            m_stage = 1;
+        }
+    } else {
+        if (m_statusText != "patching steam") {
+            m_textOpacity -= deltaTime * 6.0f;
+            if (m_textOpacity <= 0.0f) {
+                m_statusText = "patching steam";
+                m_textOpacity = 0.0f;
+            }
+        } else if (m_textOpacity < 1.0f) {
+            m_textOpacity += deltaTime * 5.0f;
+            if (m_textOpacity > 1.0f) m_textOpacity = 1.0f;
+        }
+
+        if (m_progress < 1.0f) {
+            m_progress += deltaTime * 0.15f;
+            if (m_progress > 1.0f) m_progress = 1.0f;
+        }
+
+        // Complete loading successfully when bar is 100% and patch is done
+        if (m_progress >= 1.0f && m_patchCompleted) {
+            m_animationTimer->stop();
+            if (m_patchSuccess) {
+                emit success();
+            } else {
+                emit failed(m_errorMsg);
+            }
+        }
+    }
+
+    update();
+}
+
+void LoadingWidget::paintEvent(QPaintEvent*) {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+
+    int radius = 20;
+    QPainterPath clipPath;
+    clipPath.addRoundedRect(rect(), radius, radius);
+    p.setClipPath(clipPath);
+
+    // Background: Absolute solid pure black (#000000)
+    p.fillRect(rect(), QColor(0, 0, 0));
+
+    QPointF center(width() * 0.5, height() * 0.42);
+    float outerRadius = 44.0f;
+    
+    // Outer crisp ring (slightly transparent white)
+    QPen ringPen(QColor(255, 255, 255, 240), 2.2f);
+    p.setPen(ringPen);
+    p.setBrush(Qt::NoBrush);
+    p.drawEllipse(center, outerRadius, outerRadius);
+
+    // pulsation factor
+    float expandFactor = 1.0f + std::sin(m_time * 5.0f) * 0.04f;
+
+    // Draw tool logo icon.png inside the center ring
+    p.save();
+    p.translate(center);
+    float rotationDegrees = m_time * 40.0f; // continuous spinning rotation
+    p.rotate(rotationDegrees);
+    p.scale(expandFactor, expandFactor);
+    
+    if (!m_logoPixmap.isNull()) {
+        int iconSize = 54;
+        p.drawPixmap(-iconSize/2, -iconSize/2, iconSize, iconSize, m_logoPixmap);
+    }
+    p.restore();
+
+    // Mechanical linkages
+    QPointF pivotLeft(center.x() - 6.0f + std::cos(m_time * 2.5f) * 0.8f, 
+                      center.y() - 1.0f + std::sin(m_time * 2.5f) * 0.8f);
+    QPointF gearRight(center.x() + 15.0f, center.y() - 9.0f);
+    QPointF stemEnd(pivotLeft.x() - 13.0f + std::sin(m_time * 4.0f) * 1.2f, 
+                    pivotLeft.y() - 28.0f + std::cos(m_time * 4.0f) * 1.2f);
+
+    // Draw crankshaft stem
+    QPen stemPen(QColor(255, 255, 255), 5.0f);
+    stemPen.setCapStyle(Qt::RoundCap);
+    p.setPen(stemPen);
+    p.drawLine(pivotLeft, stemEnd);
+
+    // Draw main mechanical linkage bar
+    QPen linkageOuterPen(QColor(255, 255, 255), 7.0f);
+    linkageOuterPen.setCapStyle(Qt::RoundCap);
+    p.setPen(linkageOuterPen);
+    p.drawLine(pivotLeft, gearRight);
+
+    // Black inner groove of linkage bar
+    QPen linkageInnerPen(QColor(0, 0, 0), 1.5f);
+    linkageInnerPen.setCapStyle(Qt::RoundCap);
+    p.setPen(linkageInnerPen);
+    p.drawLine(pivotLeft, gearRight);
+
+    // Left pivot disk
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0, 0, 0));
+    p.drawEllipse(pivotLeft, 8.0f, 8.0f);
+
+    p.setPen(QPen(QColor(255, 255, 255), 2.5f));
+    p.setBrush(Qt::NoBrush);
+    p.drawEllipse(pivotLeft, 8.0f, 8.0f);
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(255, 255, 255));
+    p.drawEllipse(pivotLeft, 3.0f, 3.0f);
+
+    // Right rotating disk
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0, 0, 0));
+    p.drawEllipse(gearRight, 14.0f, 14.0f);
+
+    p.setPen(QPen(QColor(255, 255, 255), 2.5f));
+    p.setBrush(Qt::NoBrush);
+    p.drawEllipse(gearRight, 14.0f, 14.0f);
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(255, 255, 255));
+    p.drawEllipse(gearRight, 7.0f * expandFactor, 7.0f * expandFactor);
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0, 0, 0));
+    p.drawEllipse(gearRight, 3.2f, 3.2f);
+    
+    // Draw Progress Bar
+    float barWidth = 380.0f;
+    float barHeight = 3.0f;
+    QPointF barMin(center.x() - barWidth * 0.5f, center.y() + 85.0f);
+    p.fillRect(QRectF(barMin, QSizeF(barWidth, barHeight)), QColor(255, 255, 255, 25));
+
+    float fillWidth = barWidth * m_progress;
+    if (fillWidth > 0.0f) {
+        p.fillRect(QRectF(barMin, QSizeF(fillWidth, barHeight)), QColor(255, 255, 255));
+    }
+
+    // Draw Sequential Text
+    QFont textFont("Segoe UI");
+    textFont.setPointSizeF(10.0);
+    textFont.setLetterSpacing(QFont::AbsoluteSpacing, 0.6);
+    textFont.setWeight(QFont::Light);
+    p.setFont(textFont);
+
+    QColor textColor(255, 255, 255, static_cast<int>(178 * m_textOpacity));
+    p.setPen(textColor);
+
+    QRectF textRect(center.x() - 250, barMin.y() + 16.0f, 500, 30);
+    p.drawText(textRect, Qt::AlignCenter, m_statusText);
+}
+
+// ============================================================================
+// MAIN ONBOARDING DIALOG IMPLEMENTATION
+// ============================================================================
+OnboardingDialog::OnboardingDialog(QWidget* parent)
+    : QDialog(parent)
+    , m_currentMode(LOGIN)
+    , m_isAvailable(false)
+    , m_isChecking(false)
+    , m_isGuest(false)
 {
     setWindowFlags(Qt::FramelessWindowHint | Qt::Dialog);
     setAttribute(Qt::WA_TranslucentBackground);
@@ -57,13 +358,6 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
         m_bgImage.load(imgPath);
     }
     
-    // Load tool logo icon
-    QString iconPath = QCoreApplication::applicationDirPath() + "/icon.png";
-    if (!QFile::exists(iconPath)) {
-        iconPath = "icon.png";
-    }
-    m_logoPixmap.load(iconPath);
-
     // Network & Debounce
     m_networkManager = new QNetworkAccessManager(this);
     m_debounceTimer = new QTimer(this);
@@ -71,24 +365,36 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
     m_debounceTimer->setInterval(300);
     connect(m_debounceTimer, &QTimer::timeout, this, &OnboardingDialog::checkAvailability);
     connect(m_networkManager, &QNetworkAccessManager::finished, this, &OnboardingDialog::onCheckFinished);
-    
-    // Setup integrated Loading timer
-    m_loadingTimer = new QTimer(this);
-    connect(m_loadingTimer, &QTimer::timeout, this, &OnboardingDialog::onLoadingUpdate);
 
-    // ── Main horizontal layout ──
-    QHBoxLayout* mainLayout = new QHBoxLayout(this);
+    // ── Build root layout using QStackedWidget container ──
+    QVBoxLayout* rootLayout = new QVBoxLayout(this);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+    rootLayout->setSpacing(0);
+
+    m_stackedWidget = new QStackedWidget(this);
+    rootLayout->addWidget(m_stackedWidget);
+
+    // Page 0: Login Form View
+    m_loginPageWidget = new QWidget(this);
+    m_stackedWidget->addWidget(m_loginPageWidget);
+
+    // Page 1: Cinematic Steam Loading View
+    m_loadingWidget = new LoadingWidget(this);
+    m_stackedWidget->addWidget(m_loadingWidget);
+
+    // ── Build standard horizontal layout for Page 0 ──
+    QHBoxLayout* mainLayout = new QHBoxLayout(m_loginPageWidget);
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
     
-    // ── Left Panel (Image) ──
-    m_leftPanel = new QWidget(this);
+    // Left Panel (Image)
+    m_leftPanel = new QWidget(m_loginPageWidget);
     m_leftPanel->setFixedWidth(360);
     m_leftPanel->setStyleSheet("background: transparent;");
     mainLayout->addWidget(m_leftPanel);
     
-    // ── Right Panel (Form) ──
-    m_rightPanel = new QWidget(this);
+    // Right Panel (Form)
+    m_rightPanel = new QWidget(m_loginPageWidget);
     m_rightPanel->setStyleSheet("background: transparent;");
     mainLayout->addWidget(m_rightPanel);
     
@@ -96,26 +402,25 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
     formLayout->setContentsMargins(45, 45, 45, 35);
     formLayout->setSpacing(0);
     
-    // ── Tab Row: Sign In | Sign Up ──
+    // Tab Row: Sign In | Sign Up
     QHBoxLayout* tabRow = new QHBoxLayout();
     tabRow->setSpacing(30);
     tabRow->setAlignment(Qt::AlignLeft);
     
-    m_tabSignIn = new QLabel("Sign In");
+    m_tabSignIn = new QLabel("Sign In", m_rightPanel);
     m_tabSignIn->setCursor(Qt::PointingHandCursor);
     m_tabSignIn->setStyleSheet(
         "font-size: 22px; font-weight: bold; color: #FFFFFF; font-family: 'Segoe UI';"
         "padding-bottom: 6px;"
     );
     
-    m_tabSignUp = new QLabel("Sign Up");
+    m_tabSignUp = new QLabel("Sign Up", m_rightPanel);
     m_tabSignUp->setCursor(Qt::PointingHandCursor);
     m_tabSignUp->setStyleSheet(
         "font-size: 22px; font-weight: normal; color: rgba(255,255,255,100); font-family: 'Segoe UI';"
         "padding-bottom: 6px;"
     );
     
-    // Make tabs clickable via event filter
     m_tabSignIn->installEventFilter(this);
     m_tabSignUp->installEventFilter(this);
     
@@ -125,12 +430,12 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
     formLayout->addLayout(tabRow);
     formLayout->addSpacing(40);
     
-    // ── Username Input ──
-    QLabel* userLabel = new QLabel("Your username");
+    // Username Input
+    QLabel* userLabel = new QLabel("Your username", m_rightPanel);
     userLabel->setStyleSheet("font-size: 12px; color: rgba(255,255,255,100); font-family: 'Segoe UI'; margin-bottom: 2px;");
     formLayout->addWidget(userLabel);
     
-    m_usernameInput = new QLineEdit();
+    m_usernameInput = new QLineEdit(m_rightPanel);
     m_usernameInput->setPlaceholderText("Enter username");
     m_usernameInput->setFixedHeight(38);
     m_usernameInput->setStyleSheet(
@@ -144,12 +449,12 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
     formLayout->addWidget(m_usernameInput);
     formLayout->addSpacing(22);
     
-    // ── Password Input ──
-    QLabel* passLabel = new QLabel("Your password");
+    // Password Input
+    QLabel* passLabel = new QLabel("Your password", m_rightPanel);
     passLabel->setStyleSheet("font-size: 12px; color: rgba(255,255,255,100); font-family: 'Segoe UI'; margin-bottom: 2px;");
     formLayout->addWidget(passLabel);
     
-    m_passwordInput = new QLineEdit();
+    m_passwordInput = new QLineEdit(m_rightPanel);
     m_passwordInput->setPlaceholderText("Enter password");
     m_passwordInput->setEchoMode(QLineEdit::Password);
     m_passwordInput->setFixedHeight(38);
@@ -163,16 +468,16 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
     );
     formLayout->addWidget(m_passwordInput);
     
-    // ── Status Label ──
-    m_statusLabel = new QLabel("");
+    // Status Label
+    m_statusLabel = new QLabel("", m_rightPanel);
     m_statusLabel->setStyleSheet("font-size: 12px; margin-top: 8px; color: #F2B8B5;");
     m_statusLabel->setWordWrap(true);
     formLayout->addWidget(m_statusLabel);
     
     formLayout->addSpacing(28);
     
-    // ── Primary Button (SIGN IN / SIGN UP) ──
-    m_continueBtn = new QPushButton("SIGN IN");
+    // Primary Button (SIGN IN / SIGN UP)
+    m_continueBtn = new QPushButton("SIGN IN", m_rightPanel);
     m_continueBtn->setFixedHeight(48);
     m_continueBtn->setCursor(Qt::PointingHandCursor);
     m_continueBtn->setStyleSheet(
@@ -192,15 +497,15 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
     
     formLayout->addSpacing(16);
     
-    // ── "or" divider ──
+    // "or" divider
     QHBoxLayout* orRow = new QHBoxLayout();
     auto makeLine = [this]() {
-        QFrame* line = new QFrame(this);
+        QFrame* line = new QFrame(m_rightPanel);
         line->setFrameShape(QFrame::HLine);
         line->setStyleSheet("background: rgba(255,255,255,15); max-height: 1px;");
         return line;
     };
-    QLabel* orLabel = new QLabel("or");
+    QLabel* orLabel = new QLabel("or", m_rightPanel);
     orLabel->setStyleSheet("font-size: 12px; color: rgba(255,255,255,80); font-family: 'Segoe UI'; padding: 0 12px;");
     orLabel->setAlignment(Qt::AlignCenter);
     orRow->addWidget(makeLine());
@@ -210,8 +515,8 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
     
     formLayout->addSpacing(16);
     
-    // ── Guest Button ──
-    m_guestBtn = new QPushButton("CONTINUE AS GUEST");
+    // Guest Button
+    m_guestBtn = new QPushButton("CONTINUE AS GUEST", m_rightPanel);
     m_guestBtn->setFixedHeight(48);
     m_guestBtn->setCursor(Qt::PointingHandCursor);
     m_guestBtn->setStyleSheet(
@@ -225,16 +530,31 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
         "}"
     );
     formLayout->addWidget(m_guestBtn);
-    
     formLayout->addStretch();
     
-    // ── Footer ──
-    QLabel* footer = new QLabel("Privacy · Terms · About");
+    // Footer
+    QLabel* footer = new QLabel("Privacy · Terms · About", m_rightPanel);
     footer->setAlignment(Qt::AlignCenter);
     footer->setStyleSheet("font-size: 11px; color: rgba(255,255,255,60); font-family: 'Segoe UI';");
     formLayout->addWidget(footer);
     
-    // ── Connections ──
+    // ── Stacked Widget Connections ──
+    connect(m_loadingWidget, &LoadingWidget::success, this, [this]() {
+        m_userData = m_loadingWidget->userData();
+        m_username = m_loadingWidget->username();
+        m_isGuest = m_loadingWidget->isGuest();
+        accept();
+    });
+    
+    connect(m_loadingWidget, &LoadingWidget::failed, this, [this](QString errMsg) {
+        m_stackedWidget->setCurrentIndex(0);
+        m_statusLabel->setText("✗ " + errMsg);
+        m_statusLabel->setStyleSheet("color: #F2B8B5;");
+        m_continueBtn->setEnabled(true);
+        m_continueBtn->setText(m_currentMode == LOGIN ? "SIGN IN" : "SIGN UP");
+    });
+
+    // ── Form Input Connections ──
     connect(m_usernameInput, &QLineEdit::returnPressed, this, &OnboardingDialog::onPrimaryClicked);
     connect(m_passwordInput, &QLineEdit::returnPressed, this, &OnboardingDialog::onPrimaryClicked);
     connect(m_usernameInput, &QLineEdit::textChanged, this, &OnboardingDialog::onUsernameChanged);
@@ -245,7 +565,7 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
 }
 
 bool OnboardingDialog::eventFilter(QObject* obj, QEvent* event) {
-    if (m_isLoading) return true; // Block event handling during load
+    if (m_stackedWidget->currentIndex() == 1) return true; // Block during loading
     if (event->type() == QEvent::MouseButtonPress) {
         if (obj == m_tabSignIn) {
             switchToLogin();
@@ -259,8 +579,8 @@ bool OnboardingDialog::eventFilter(QObject* obj, QEvent* event) {
 }
 
 void OnboardingDialog::keyPressEvent(QKeyEvent* event) {
-    if (m_isLoading && event->key() == Qt::Key_Escape) {
-        event->accept();
+    if (m_stackedWidget->currentIndex() == 1 && event->key() == Qt::Key_Escape) {
+        event->accept(); // Disable ESC closing during active loading
     } else {
         QDialog::keyPressEvent(event);
     }
@@ -298,12 +618,12 @@ void OnboardingDialog::switchToRegister() {
     );
     
     m_continueBtn->setText("SIGN UP");
-    m_continueBtn->setEnabled(false); // Needs username check
+    m_continueBtn->setEnabled(false);
     m_usernameInput->setFocus();
 }
 
 void OnboardingDialog::onUsernameChanged(const QString& text) {
-    if (m_currentMode == LOGIN || m_isLoading) return;
+    if (m_currentMode == LOGIN || m_stackedWidget->currentIndex() == 1) return;
     
     m_continueBtn->setEnabled(false);
     m_isAvailable = false;
@@ -318,7 +638,7 @@ void OnboardingDialog::onUsernameChanged(const QString& text) {
 }
 
 void OnboardingDialog::checkAvailability() {
-    if (m_isLoading) return;
+    if (m_stackedWidget->currentIndex() == 1) return;
     QString url = Config::WEBSERVER_BASE_URL + "/api/user/check/" + m_usernameInput->text().trimmed();
     QNetworkReply* reply = m_networkManager->get(QNetworkRequest(QUrl(url)));
     reply->setProperty("type", "check");
@@ -326,7 +646,7 @@ void OnboardingDialog::checkAvailability() {
 
 void OnboardingDialog::onCheckFinished(QNetworkReply* reply) {
     reply->deleteLater();
-    if (m_isLoading) return;
+    if (m_stackedWidget->currentIndex() == 1) return;
     if (reply->property("type").toString() != "check") return;
     if (reply->error() != QNetworkReply::NoError) {
          m_statusLabel->setText("✗ Connection error");
@@ -341,7 +661,8 @@ void OnboardingDialog::onCheckFinished(QNetworkReply* reply) {
 }
 
 void OnboardingDialog::onGuestClicked() {
-    startLoadingFlow("", "");
+    m_stackedWidget->setCurrentIndex(1);
+    m_loadingWidget->start("", "", false, true);
 }
 
 void OnboardingDialog::onPrimaryClicked() {
@@ -356,180 +677,12 @@ void OnboardingDialog::onPrimaryClicked() {
         return;
     }
     
-    startLoadingFlow(user, pass);
-}
-
-void OnboardingDialog::startLoadingFlow(const QString& user, const QString& pass) {
-    m_isLoading = true;
-    m_loadingProgress = 0.0f;
-    m_loadingTime = 0.0f;
-    m_loadingStage = 0;
-    m_textOpacity = 1.0f;
-    m_statusText = "verifying details";
-    m_authCompleted = false;
-    m_authSuccess = false;
-    m_patchCompleted = false;
-    m_patchSuccess = false;
-    m_loadingError = "";
-
-    showLoadingView();
-
-    m_loadingTimer->start(16);
-    m_loadingElapsed.start();
-
-    if (user.isEmpty() && pass.isEmpty()) {
-        // Guest mode bypasses auth
-        m_authCompleted = true;
-        m_authSuccess = true;
-        m_isGuest = true;
-        m_username = "Guest";
-        m_loadingStage = 1;
-        m_statusText = "patching steam";
-        startPatchingProcess();
-    } else {
-        m_isGuest = false;
-        QString endpoint = (m_currentMode == REGISTER) ? "/api/user/register" : "/api/user/login";
-        QNetworkRequest req(QUrl(Config::WEBSERVER_BASE_URL + endpoint));
-        req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-
-        QJsonObject body;
-        body["username"] = user;
-        body["password"] = pass;
-
-        m_authReply = m_networkManager->post(req, QJsonDocument(body).toJson());
-        connect(m_authReply, &QNetworkReply::finished, this, [this](){ onAuthFinished(m_authReply); });
-    }
-}
-
-void OnboardingDialog::onAuthFinished(QNetworkReply* reply) {
-    if (!reply) return;
-    reply->deleteLater();
-
-    QByteArray responseData = reply->readAll();
-    QJsonObject obj = QJsonDocument::fromJson(responseData).object();
-
-    if (reply->error() == QNetworkReply::NoError && obj["success"].toBool()) {
-        m_userData = obj["user"].toObject();
-        m_username = m_userData["username"].toString();
-        m_authSuccess = true;
-        m_authCompleted = true;
-        
-        // Start patching steam as soon as authentication finishes successfully
-        startPatchingProcess();
-    } else {
-        m_authSuccess = false;
-        m_authCompleted = true;
-
-        QString errorMsg = "Auth failed";
-        if (!obj["error"].toString().isEmpty()) {
-            errorMsg = obj["error"].toString();
-        } else if (reply->error() != QNetworkReply::NoError) {
-            errorMsg = reply->errorString();
-        } else if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-            errorMsg = "Invalid username or password";
-        }
-        
-        m_loadingError = errorMsg;
-        m_isLoading = false;
-        m_loadingTimer->stop();
-        
-        hideLoadingView();
-        m_statusLabel->setText("✗ " + errorMsg);
-        m_statusLabel->setStyleSheet("color: #F2B8B5;");
-    }
-    m_authReply = nullptr;
-}
-
-void OnboardingDialog::startPatchingProcess() {
-    m_patchWorker = new SteamPatchWorker(this);
-    connect(m_patchWorker, &SteamPatchWorker::log, this, &OnboardingDialog::onPatchLog);
-    connect(m_patchWorker, &SteamPatchWorker::finished, this, &OnboardingDialog::onPatchFinished);
-    connect(m_patchWorker, &SteamPatchWorker::error, this, &OnboardingDialog::onPatchError);
-    connect(m_patchWorker, &QThread::finished, m_patchWorker, &QObject::deleteLater);
-    m_patchWorker->start();
-}
-
-void OnboardingDialog::onPatchLog(const QString& msg, const QString& level) {
-    qDebug() << "[Integrated Loader]" << level << ":" << msg;
-}
-
-void OnboardingDialog::onPatchFinished(const QString&) {
-    m_patchSuccess = true;
-    m_patchCompleted = true;
-}
-
-void OnboardingDialog::onPatchError(const QString& err) {
-    m_patchSuccess = false;
-    m_patchCompleted = true;
-    m_loadingError = "Steam patch failed: " + err;
+    m_continueBtn->setEnabled(false);
+    m_continueBtn->setText("Processing...");
     
-    m_isLoading = false;
-    m_loadingTimer->stop();
-    
-    hideLoadingView();
-    m_statusLabel->setText("✗ Steam patch failed: " + err);
-    m_statusLabel->setStyleSheet("color: #F2B8B5;");
-}
-
-void OnboardingDialog::onLoadingUpdate() {
-    float deltaTime = m_loadingElapsed.restart() / 1000.0f;
-    if (deltaTime > 0.1f) deltaTime = 0.1f;
-
-    m_loadingTime += deltaTime;
-
-    // Progress updates
-    if (m_loadingStage == 0) {
-        if (m_loadingProgress < 0.50f) {
-            m_loadingProgress += deltaTime * 0.20f;
-            if (m_loadingProgress > 0.50f) m_loadingProgress = 0.50f;
-        }
-        if (m_authCompleted && m_authSuccess && m_loadingProgress >= 0.50f) {
-            m_loadingStage = 1;
-        }
-    } else {
-        if (m_statusText != "patching steam") {
-            m_textOpacity -= deltaTime * 6.0f;
-            if (m_textOpacity <= 0.0f) {
-                m_statusText = "patching steam";
-                m_textOpacity = 0.0f;
-            }
-        } else if (m_textOpacity < 1.0f) {
-            m_textOpacity += deltaTime * 5.0f;
-            if (m_textOpacity > 1.0f) m_textOpacity = 1.0f;
-        }
-
-        if (m_loadingProgress < 1.0f) {
-            m_loadingProgress += deltaTime * 0.15f;
-            if (m_loadingProgress > 1.0f) m_loadingProgress = 1.0f;
-        }
-
-        // Accept the dialog entirely when progress hits 100% and patch is done
-        if (m_loadingProgress >= 1.0f && m_patchCompleted) {
-            m_loadingTimer->stop();
-            if (m_patchSuccess) {
-                accept();
-            }
-        }
-    }
-
-    update();
-}
-
-void OnboardingDialog::showLoadingView() {
-    m_leftPanel->hide();
-    m_rightPanel->hide();
-}
-
-void OnboardingDialog::hideLoadingView() {
-    m_leftPanel->show();
-    m_rightPanel->show();
-    
-    m_continueBtn->setEnabled(true);
-    if (m_currentMode == LOGIN) {
-        switchToLogin();
-    } else {
-        switchToRegister();
-    }
+    // Switch to page 1 and kickstart animation + auth
+    m_stackedWidget->setCurrentIndex(1);
+    m_loadingWidget->start(user, pass, (m_currentMode == REGISTER), false);
 }
 
 void OnboardingDialog::paintEvent(QPaintEvent*) {
@@ -541,139 +694,9 @@ void OnboardingDialog::paintEvent(QPaintEvent*) {
     clipPath.addRoundedRect(rect(), radius, radius);
     p.setClipPath(clipPath);
     
-    if (m_isLoading) {
-        // =======================================================
-        // 1. DRAW INTEGRATED SOLID BLACK LOADING STATE
-        // =======================================================
-        p.fillRect(rect(), QColor(0, 0, 0));
-        
-        QPointF center(width() * 0.5, height() * 0.42);
-        
-        // ==========================================
-        // DRAW THE ROTATING MECHANICAL LOGO WITH ICON.PNG IN CENTER
-        // ==========================================
-        float outerRadius = 44.0f;
-        
-        // Outer crisp ring (slightly transparent white)
-        QPen ringPen(QColor(255, 255, 255, 240), 2.2f);
-        p.setPen(ringPen);
-        p.setBrush(Qt::NoBrush);
-        p.drawEllipse(center, outerRadius, outerRadius);
-        
-        // pulsation factor
-        float expandFactor = 1.0f + std::sin(m_loadingTime * 5.0f) * 0.04f;
-
-        // Draw tool logo icon.png inside the center ring
-        p.save();
-        p.translate(center);
-        
-        // Apply smooth rotation and pulsation to the tool logo
-        float rotationDegrees = m_loadingTime * 40.0f; // continuous spinning rotation
-        p.rotate(rotationDegrees);
-        p.scale(expandFactor, expandFactor);
-        
-        if (!m_logoPixmap.isNull()) {
-            int iconSize = 54;
-            p.drawPixmap(-iconSize/2, -iconSize/2, iconSize, iconSize, m_logoPixmap);
-        }
-        p.restore();
-
-        // Mechanical elements moving around/with it
-        // Left pivot point
-        QPointF pivotLeft(center.x() - 6.0f + std::cos(m_loadingTime * 2.5f) * 0.8f, 
-                          center.y() - 1.0f + std::sin(m_loadingTime * 2.5f) * 0.8f);
-        
-        // Right gears center
-        QPointF gearRight(center.x() + 15.0f, center.y() - 9.0f);
-        
-        // Angled crankshaft coordinate updates
-        QPointF stemEnd(pivotLeft.x() - 13.0f + std::sin(m_loadingTime * 4.0f) * 1.2f, 
-                        pivotLeft.y() - 28.0f + std::cos(m_loadingTime * 4.0f) * 1.2f);
-
-        // Draw crankshaft stem
-        QPen stemPen(QColor(255, 255, 255), 5.0f);
-        stemPen.setCapStyle(Qt::RoundCap);
-        p.setPen(stemPen);
-        p.drawLine(pivotLeft, stemEnd);
-
-        // Draw main mechanical linkage bar (flywheel linkage)
-        QPen linkageOuterPen(QColor(255, 255, 255), 7.0f);
-        linkageOuterPen.setCapStyle(Qt::RoundCap);
-        p.setPen(linkageOuterPen);
-        p.drawLine(pivotLeft, gearRight);
-
-        // Black inner groove of linkage bar
-        QPen linkageInnerPen(QColor(0, 0, 0), 1.5f);
-        linkageInnerPen.setCapStyle(Qt::RoundCap);
-        p.setPen(linkageInnerPen);
-        p.drawLine(pivotLeft, gearRight);
-
-        // Left pivot disk
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0, 0, 0));
-        p.drawEllipse(pivotLeft, 8.0f, 8.0f);
-
-        p.setPen(QPen(QColor(255, 255, 255), 2.5f));
-        p.setBrush(Qt::NoBrush);
-        p.drawEllipse(pivotLeft, 8.0f, 8.0f);
-
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(255, 255, 255));
-        p.drawEllipse(pivotLeft, 3.0f, 3.0f);
-
-        // Right rotating disk
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0, 0, 0));
-        p.drawEllipse(gearRight, 14.0f, 14.0f);
-
-        p.setPen(QPen(QColor(255, 255, 255), 2.5f));
-        p.setBrush(Qt::NoBrush);
-        p.drawEllipse(gearRight, 14.0f, 14.0f);
-
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(255, 255, 255));
-        p.drawEllipse(gearRight, 7.0f * expandFactor, 7.0f * expandFactor);
-
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0, 0, 0));
-        p.drawEllipse(gearRight, 3.2f, 3.2f);
-        
-        // ==========================================
-        // 2. DRAW CRISP PROGRESS BAR
-        // ==========================================
-        float barWidth = 380.0f;
-        float barHeight = 3.0f;
-        QPointF barMin(center.x() - barWidth * 0.5f, center.y() + 85.0f);
-        
-        // Background track (rgba(255, 255, 255, 0.1))
-        p.fillRect(QRectF(barMin, QSizeF(barWidth, barHeight)), QColor(255, 255, 255, 25));
-
-        // Active progress fill (Solid pure white)
-        float fillWidth = barWidth * m_loadingProgress;
-        if (fillWidth > 0.0f) {
-            p.fillRect(QRectF(barMin, QSizeF(fillWidth, barHeight)), QColor(255, 255, 255));
-        }
-
-        // ==========================================
-        // 3. DRAW LOWERCASE TEXT WITH FADE
-        // ==========================================
-        QFont textFont("Segoe UI");
-        textFont.setPointSizeF(10.0);
-        textFont.setLetterSpacing(QFont::AbsoluteSpacing, 0.6);
-        textFont.setWeight(QFont::Light);
-        p.setFont(textFont);
-
-        QColor textColor(255, 255, 255, static_cast<int>(178 * m_textOpacity));
-        p.setPen(textColor);
-
-        QRectF textRect(center.x() - 250, barMin.y() + 16.0f, 500, 30);
-        p.drawText(textRect, Qt::AlignCenter, m_statusText);
-        
-    } else {
-        // =======================================================
-        // 2. DRAW STANDARD BLUE LOGIN LAYOUT
-        // =======================================================
-        // Draw full background (dark navy)
+    // We only paint the background for the login page widget here (since Page 1 LoadingWidget paints its own black background)
+    if (m_stackedWidget->currentIndex() == 0) {
+        // Draw full background (dark navy #0a0d36)
         p.fillRect(rect(), QColor("#0a0d36"));
         
         // Draw left panel image
