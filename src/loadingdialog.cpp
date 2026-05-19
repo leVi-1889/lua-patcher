@@ -3,6 +3,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QKeyEvent>
+#include <QPainterPath>
 #include <cmath>
 
 LoadingDialog::LoadingDialog(const QString& username, const QString& password, bool isRegister, bool isGuest, QWidget* parent)
