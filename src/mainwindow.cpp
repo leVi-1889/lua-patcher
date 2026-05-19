@@ -2970,25 +2970,36 @@ void MainWindow::refreshFriendsList() {
                 p.setFont(QFont("Segoe UI", 12, QFont::Bold));
                 p.drawText(pix.rect(), Qt::AlignCenter, fName.left(1).toUpper());
             }
+            bool isOnline = f["online"].toBool();
+            if (isOnline) {
+                p.setBrush(QColor("#0F121A")); // dark background matching friends sidebar
+                p.setPen(Qt::NoPen);
+                p.drawEllipse(QPointF(34.0f, 34.0f), 7.0f, 7.0f);
+                
+                p.setBrush(QColor("#2ECC71"));
+                p.drawEllipse(QPointF(34.0f, 34.0f), 4.5f, 4.5f);
+            }
             p.end();
             av->setPixmap(pix);
             lay->addWidget(av);
             
             QVBoxLayout* info = new QVBoxLayout();
             info->setSpacing(2);
+            info->setAlignment(Qt::AlignVCenter);
+            
             QLabel* name = new QLabel(fName);
             name->setStyleSheet("color: white; font-weight: bold; font-size: 13px; background: transparent;");
-            
-            bool isOnline = f["online"].toBool();
-            QString statusText = isOnline ? "ONLINE" : "OFFLINE";
-            if (f.contains("activity")) statusText = f["activity"].toString().toUpper();
-
-            QLabel* status = new QLabel(statusText);
-            status->setStyleSheet(QString("color: %1; font-size: 10px; font-weight: bold; background: transparent;")
-                                  .arg(isOnline ? "#2ECC71" : "#95A5A6"));
-            
             info->addWidget(name);
-            info->addWidget(status);
+            
+            if (isOnline) {
+                QString statusText = "ONLINE";
+                if (f.contains("activity")) statusText = f["activity"].toString().toUpper();
+
+                QLabel* status = new QLabel(statusText);
+                status->setStyleSheet("color: #2ECC71; font-size: 10px; font-weight: bold; background: transparent;");
+                info->addWidget(status);
+            }
+            
             lay->addLayout(info);
             lay->addStretch();
             
