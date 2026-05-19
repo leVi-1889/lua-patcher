@@ -4,9 +4,15 @@
 #include "config.h"
 #include <QScrollBar>
 #include <QGraphicsDropShadowEffect>
+#include <QPainter>
+#include <QPainterPath>
 
-ChatPage::ChatPage(const QString& myUsername, const QString& friendUsername, QNetworkAccessManager* netMgr, QWidget* parent)
-    : QWidget(parent), m_myUsername(myUsername), m_friendUsername(friendUsername), m_netMgr(netMgr)
+ChatPage::ChatPage(const QString& myUsername, const QString& friendUsername, const QString& friendAvatarBase64, QNetworkAccessManager* netMgr, QWidget* parent)
+    : QWidget(parent)
+    , m_myUsername(myUsername)
+    , m_friendUsername(friendUsername)
+    , m_friendAvatarBase64(friendAvatarBase64)
+    , m_netMgr(netMgr)
 {
     setupUI();
 
@@ -33,29 +39,52 @@ void ChatPage::setupUI() {
     headerLayout->setContentsMargins(0, 0, 0, 0);
     headerLayout->setSpacing(16);
 
-    QPushButton* backBtn = new QPushButton("← Back");
-    backBtn->setFixedSize(90, 36);
+    // Compact circular back button matching modern premium aesthetic
+    QPushButton* backBtn = new QPushButton("←");
+    backBtn->setFixedSize(36, 36);
     backBtn->setCursor(Qt::PointingHandCursor);
     backBtn->setStyleSheet(
         "QPushButton {"
-        "  font-size: 14px; font-weight: bold; color: #EFECE3;"
-        "  background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);"
-        "  border-radius: 18px; padding: 6px 16px;"
+        "  font-size: 18px; font-weight: bold; color: #EFECE3;"
+        "  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1);"
+        "  border-radius: 18px; padding-bottom: 2px;"
         "  font-family: 'Segoe UI';"
         "}"
         "QPushButton:hover {"
-        "  background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25);"
+        "  background: rgba(255, 255, 255, 0.15); border-color: rgba(255, 255, 255, 0.25);"
         "}"
     );
     connect(backBtn, &QPushButton::clicked, this, &ChatPage::backRequested);
     headerLayout->addWidget(backBtn);
 
-    // Avatar Placeholder
+    // Avatar rendering friend profile photo
     QLabel* avatar = new QLabel();
     avatar->setFixedSize(44, 44);
-    avatar->setStyleSheet("background: #4A6FA5; border-radius: 22px; color: white; font-weight: bold; font-size: 16px;");
-    avatar->setAlignment(Qt::AlignCenter);
-    avatar->setText(m_friendUsername.left(1).toUpper());
+    QPixmap pix(44, 44);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing);
+
+    if (!m_friendAvatarBase64.isEmpty()) {
+        QPixmap original;
+        original.loadFromData(QByteArray::fromBase64(m_friendAvatarBase64.toUtf8()));
+        if (!original.isNull()) {
+            QPainterPath path;
+            path.addEllipse(0, 0, 44, 44);
+            p.setClipPath(path);
+            p.drawPixmap(0, 0, 44, 44, original.scaled(44, 44, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
+            p.setClipping(false);
+        }
+    } else {
+        p.setBrush(QColor("#2C3545"));
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(0, 0, 44, 44);
+        p.setPen(Qt::white);
+        p.setFont(QFont("Segoe UI", 12, QFont::Bold));
+        p.drawText(pix.rect(), Qt::AlignCenter, m_friendUsername.left(1).toUpper());
+    }
+    p.end();
+    avatar->setPixmap(pix);
     headerLayout->addWidget(avatar);
 
     QVBoxLayout* nameCol = new QVBoxLayout();

@@ -1289,7 +1289,7 @@ void MainWindow::initUI() {
     m_stack->addWidget(m_gameDetailsPage); // index 3
     
     // index 4: Chat Page
-    m_chatPage = new ChatPage(m_username, "", m_networkManager, this);
+    m_chatPage = new ChatPage(m_username, "", "", m_networkManager, this);
     connect(m_chatPage, &ChatPage::backRequested, this, &MainWindow::onChatBack);
     m_stack->addWidget(m_chatPage); // index 4
     
@@ -2915,7 +2915,9 @@ void MainWindow::refreshFriendsList() {
                 m_friendPopover = new FriendPopover(fName, fAvatarUrl, this);
                 
                 // Connect signals
-                connect(m_friendPopover, &FriendPopover::messageClicked, this, &MainWindow::openChat);
+                connect(m_friendPopover, &FriendPopover::messageClicked, this, [this, fAvatarUrl](const QString& fName) {
+                    openChat(fName, fAvatarUrl);
+                });
                 connect(m_friendPopover, &FriendPopover::viewProfileClicked, this, [this](const QString& username) {
                     UserProfileDialog* dlg = new UserProfileDialog(username, m_username, m_networkManager, this);
                     
@@ -2990,15 +2992,7 @@ void MainWindow::refreshFriendsList() {
             QLabel* name = new QLabel(fName);
             name->setStyleSheet("color: white; font-weight: bold; font-size: 13px; background: transparent;");
             info->addWidget(name);
-            
-            if (isOnline) {
-                QString statusText = "ONLINE";
-                if (f.contains("activity")) statusText = f["activity"].toString().toUpper();
 
-                QLabel* status = new QLabel(statusText);
-                status->setStyleSheet("color: #2ECC71; font-size: 10px; font-weight: bold; background: transparent;");
-                info->addWidget(status);
-            }
             
             lay->addLayout(info);
             lay->addStretch();
@@ -3008,7 +3002,7 @@ void MainWindow::refreshFriendsList() {
     });
 }
 
-void MainWindow::openChat(const QString& friendUsername) {
+void MainWindow::openChat(const QString& friendUsername, const QString& avatarUrl) {
     if (!m_chatPage) return;
     
     // Only save the previous index if we are NOT already on the chat page
@@ -3022,7 +3016,7 @@ void MainWindow::openChat(const QString& friendUsername) {
     m_stack->removeWidget(m_chatPage);
     delete m_chatPage;
     
-    m_chatPage = new ChatPage(m_username, friendUsername, m_networkManager, this);
+    m_chatPage = new ChatPage(m_username, friendUsername, avatarUrl, m_networkManager, this);
     connect(m_chatPage, &ChatPage::backRequested, this, &MainWindow::onChatBack);
     m_stack->insertWidget(4, m_chatPage);
     

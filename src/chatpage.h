@@ -19,7 +19,7 @@
 class ChatPage : public QWidget {
     Q_OBJECT
 public:
-    explicit ChatPage(const QString& myUsername, const QString& friendUsername, QNetworkAccessManager* netMgr, QWidget* parent = nullptr);
+    explicit ChatPage(const QString& myUsername, const QString& friendUsername, const QString& friendAvatarBase64, QNetworkAccessManager* netMgr, QWidget* parent = nullptr);
     ~ChatPage();
 
 signals:
@@ -37,6 +37,7 @@ private:
 
     QString m_myUsername;
     QString m_friendUsername;
+    QString m_friendAvatarBase64;
     QNetworkAccessManager* m_netMgr;
     QTimer* m_pollTimer;
 
