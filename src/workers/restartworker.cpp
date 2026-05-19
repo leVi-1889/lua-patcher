@@ -146,13 +146,40 @@ void RestartWorker::run() {
         writeLog("  pid: " + reg2.value("pid", "N/A").toString());
         writeLog("  ActiveUser: " + reg2.value("ActiveUser", "N/A").toString());
 
-        // 9. LAUNCH Steam
+        // 9. FIX: Clear stale appcache so DLL can inject fresh license data
+        writeLog("--- CLEARING APPCACHE (THE FIX) ---");
+        QString appInfoVdf = QDir(appCacheDir).filePath("appinfo.vdf");
+        QString pkgInfoVdf = QDir(appCacheDir).filePath("packageinfo.vdf");
+        if (QFile::exists(appInfoVdf)) {
+            bool removed = QFile::remove(appInfoVdf);
+            writeLog("  appinfo.vdf: " + QString(removed ? "DELETED" : "FAILED TO DELETE"));
+        } else {
+            writeLog("  appinfo.vdf: already absent");
+        }
+        if (QFile::exists(pkgInfoVdf)) {
+            bool removed = QFile::remove(pkgInfoVdf);
+            writeLog("  packageinfo.vdf: " + QString(removed ? "DELETED" : "FAILED TO DELETE"));
+        } else {
+            writeLog("  packageinfo.vdf: already absent");
+        }
+        emit log("Clearing Steam cache...", "INFO");
+
+        // 10. FIX: Clear stale registry session so Steam doesn't think old instance is running
+        writeLog("--- CLEARING REGISTRY SESSION ---");
+        reg2.remove("pid");
+        reg2.remove("ActiveUser");
+        reg2.remove("StartupFinished");
+        reg2.sync();
+        writeLog("  Cleared pid, ActiveUser, StartupFinished");
+
+        // 11. LAUNCH Steam
         writeLog("--- LAUNCHING STEAM ---");
         if (QFile::exists(steamExe)) {
             writeLog("  Method: QProcess::startDetached");
             writeLog("  Exe: " + steamExe);
             writeLog("  Args: (none)");
-            QProcess::startDetached(steamExe, QStringList());
+            writeLog("  WorkingDir: " + steamDir);
+            QProcess::startDetached(steamExe, QStringList(), steamDir);
             writeLog("  Launch: OK");
             emit log("Steam launched!", "INFO");
 
