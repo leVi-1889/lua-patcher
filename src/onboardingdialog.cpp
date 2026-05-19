@@ -247,61 +247,6 @@ void LoadingWidget::paintEvent(QPaintEvent*) {
         p.drawPixmap(-iconSize/2, -iconSize/2, iconSize, iconSize, m_logoPixmap);
     }
     p.restore();
-
-    // Mechanical linkages
-    QPointF pivotLeft(center.x() - 6.0f + std::cos(m_time * 2.5f) * 0.8f, 
-                      center.y() - 1.0f + std::sin(m_time * 2.5f) * 0.8f);
-    QPointF gearRight(center.x() + 15.0f, center.y() - 9.0f);
-    QPointF stemEnd(pivotLeft.x() - 13.0f + std::sin(m_time * 4.0f) * 1.2f, 
-                    pivotLeft.y() - 28.0f + std::cos(m_time * 4.0f) * 1.2f);
-
-    // Draw crankshaft stem
-    QPen stemPen(QColor(255, 255, 255), 5.0f);
-    stemPen.setCapStyle(Qt::RoundCap);
-    p.setPen(stemPen);
-    p.drawLine(pivotLeft, stemEnd);
-
-    // Draw main mechanical linkage bar
-    QPen linkageOuterPen(QColor(255, 255, 255), 7.0f);
-    linkageOuterPen.setCapStyle(Qt::RoundCap);
-    p.setPen(linkageOuterPen);
-    p.drawLine(pivotLeft, gearRight);
-
-    // Black inner groove of linkage bar
-    QPen linkageInnerPen(QColor(0, 0, 0), 1.5f);
-    linkageInnerPen.setCapStyle(Qt::RoundCap);
-    p.setPen(linkageInnerPen);
-    p.drawLine(pivotLeft, gearRight);
-
-    // Left pivot disk
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0, 0, 0));
-    p.drawEllipse(pivotLeft, 8.0f, 8.0f);
-
-    p.setPen(QPen(QColor(255, 255, 255), 2.5f));
-    p.setBrush(Qt::NoBrush);
-    p.drawEllipse(pivotLeft, 8.0f, 8.0f);
-
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(255, 255, 255));
-    p.drawEllipse(pivotLeft, 3.0f, 3.0f);
-
-    // Right rotating disk
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0, 0, 0));
-    p.drawEllipse(gearRight, 14.0f, 14.0f);
-
-    p.setPen(QPen(QColor(255, 255, 255), 2.5f));
-    p.setBrush(Qt::NoBrush);
-    p.drawEllipse(gearRight, 14.0f, 14.0f);
-
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(255, 255, 255));
-    p.drawEllipse(gearRight, 7.0f * expandFactor, 7.0f * expandFactor);
-
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0, 0, 0));
-    p.drawEllipse(gearRight, 3.2f, 3.2f);
     
     // Draw Progress Bar
     float barWidth = 380.0f;
