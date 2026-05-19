@@ -1,4 +1,5 @@
 #include "onboardingdialog.h"
+#include "loadingdialog.h"
 #include "utils/colors.h"
 #include "config.h"
 #include <QVBoxLayout>
@@ -266,8 +267,15 @@ void OnboardingDialog::switchToRegister() {
 }
 
 void OnboardingDialog::onGuestClicked() {
-    m_isGuest = true;
-    accept();
+    LoadingDialog loader("", "", false, true, this);
+    if (loader.exec() == QDialog::Accepted) {
+        m_isGuest = true;
+        m_username = "Guest";
+        accept();
+    } else {
+        m_statusLabel->setText("✗ " + loader.errorMsg());
+        m_statusLabel->setStyleSheet("color: #F2B8B5;");
+    }
 }
 
 void OnboardingDialog::onUsernameChanged(const QString& text) {
@@ -321,45 +329,13 @@ void OnboardingDialog::onPrimaryClicked() {
     m_continueBtn->setEnabled(false);
     m_continueBtn->setText("Processing...");
     
-    QString endpoint = (m_currentMode == LOGIN) ? "/api/user/login" : "/api/user/register";
-    QNetworkRequest req(QUrl(Config::WEBSERVER_BASE_URL + endpoint));
-    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    
-    QJsonObject body;
-    body["username"] = user;
-    body["password"] = pass;
-    
-    QNetworkReply* reply = m_networkManager->post(req, QJsonDocument(body).toJson());
-    connect(reply, &QNetworkReply::finished, this, [this, reply](){ onAuthFinished(reply); });
-}
-
-void OnboardingDialog::onAuthFinished(QNetworkReply* reply) {
-    reply->deleteLater();
-    
-    QByteArray responseData = reply->readAll();
-    QJsonObject obj = QJsonDocument::fromJson(responseData).object();
-    
-    if (reply->error() == QNetworkReply::NoError && obj["success"].toBool()) {
-        m_userData = obj["user"].toObject();
-        m_username = m_userData["username"].toString();
+    LoadingDialog loader(user, pass, (m_currentMode == REGISTER), false, this);
+    if (loader.exec() == QDialog::Accepted) {
+        m_userData = loader.userData();
+        m_username = loader.username();
         accept();
     } else {
-        QString errorMsg = "Auth failed";
-        
-        // Priority 1: Check server JSON error message
-        if (!obj["error"].toString().isEmpty()) {
-            errorMsg = obj["error"].toString();
-        } 
-        // Priority 2: Check Qt Network error string
-        else if (reply->error() != QNetworkReply::NoError) {
-            errorMsg = reply->errorString();
-        }
-        // Priority 3: Fallback for 401/403 without JSON
-        else if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-            errorMsg = "Invalid username or password";
-        }
-        
-        m_statusLabel->setText("✗ " + errorMsg);
+        m_statusLabel->setText("✗ " + loader.errorMsg());
         m_statusLabel->setStyleSheet("color: #F2B8B5;");
         m_continueBtn->setEnabled(true);
         m_continueBtn->setText(m_currentMode == LOGIN ? "SIGN IN" : "SIGN UP");
