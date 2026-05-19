@@ -26,8 +26,6 @@
 #include <QProcess>
 #include <QApplication>
 #include <QImageWriter>
-#include <QTextStream>
-#include <QDir>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -1912,7 +1910,7 @@ void MainWindow::startSync() {
     // Always start background sync to get fresh data
     m_syncWorker = new IndexDownloadWorker(this);
     connect(m_syncWorker, &IndexDownloadWorker::finished, this, &MainWindow::onSyncDone);
-    connect(m_syncWorker, &IndexDownloadWorker::progress, this, [this](QString msg) {
+    connect(m_syncWorker, &IndexDownloadWorker::progress, [this](QString msg) {
         // Only show sync progress if we don't already have cached data displayed
         if (!m_hasCachedData) m_statusLabel->setText(msg);
     });
@@ -2353,7 +2351,7 @@ void MainWindow::runPatchLogic() {
     
     m_dlWorker = new LuaDownloadWorker(m_selectedGame["appid"], this);
     connect(m_dlWorker, &LuaDownloadWorker::finished, this, &MainWindow::onPatchDone);
-    connect(m_dlWorker, &LuaDownloadWorker::progress, this, [this](qint64 dl, qint64 total) {
+    connect(m_dlWorker, &LuaDownloadWorker::progress, [this](qint64 dl, qint64 total) {
         if (total > 0) {
             int pct = static_cast<int>(dl * 100 / total);
             m_progress->setValue(pct);
@@ -2362,7 +2360,7 @@ void MainWindow::runPatchLogic() {
             }
         }
     });
-    connect(m_dlWorker, &LuaDownloadWorker::status, this, [this](QString msg) { m_statusLabel->setText(msg); });
+    connect(m_dlWorker, &LuaDownloadWorker::status, [this](QString msg) { m_statusLabel->setText(msg); });
     connect(m_dlWorker, &LuaDownloadWorker::error, this, &MainWindow::onPatchError);
     m_dlWorker->start();
 }
@@ -2452,7 +2450,7 @@ void MainWindow::runGenerateLogic() {
             }
         }
     });
-    connect(m_genWorker, &GeneratorWorker::progress, this, [this](qint64 dl, qint64 total) {
+    connect(m_genWorker, &GeneratorWorker::progress, [this](qint64 dl, qint64 total) {
         if (total > 0) {
             int pct = static_cast<int>(dl * 100 / total);
             m_progress->setValue(pct);
@@ -2461,28 +2459,15 @@ void MainWindow::runGenerateLogic() {
             }
         }
     });
-    connect(m_genWorker, &GeneratorWorker::status, this, [this](QString msg) { m_statusLabel->setText(msg); });
+    connect(m_genWorker, &GeneratorWorker::status, [this](QString msg) { m_statusLabel->setText(msg); });
     connect(m_genWorker, &GeneratorWorker::log, m_terminalDialog, &TerminalDialog::appendLog);
     connect(m_genWorker, &GeneratorWorker::error, this, &MainWindow::onPatchError);
     m_genWorker->start();
 }
 
 void MainWindow::doRestart() {
-    m_terminalDialog->clear();
-    m_terminalDialog->appendLog("Starting Steam restart sequence...", "INFO");
-    m_terminalDialog->show();
-
     m_restartWorker = new RestartWorker(this);
-    connect(m_restartWorker, &RestartWorker::log, m_terminalDialog, &TerminalDialog::appendLog);
-    connect(m_restartWorker, &RestartWorker::finished, this, [this](QString msg) {
-        m_statusLabel->setText(msg);
-        m_terminalDialog->setFinished(true);
-    });
-    connect(m_restartWorker, &RestartWorker::error, this, [this](QString err) {
-        m_statusLabel->setText("Restart failed: " + err);
-        m_terminalDialog->appendLog(err, "ERROR");
-        m_terminalDialog->setFinished(false);
-    });
+    connect(m_restartWorker, &RestartWorker::finished, m_statusLabel, &QLabel::setText);
     m_restartWorker->start();
 }
 
@@ -2838,14 +2823,6 @@ void MainWindow::setInitialUser(const QString& username, const QJsonObject& data
         }
     }
     updateSidebarAvatar();
-    
-    // Check if initial setup is needed
-    QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    QString settingsPath = appDataPath + "/settings.ini";
-    QSettings settings(settingsPath, QSettings::IniFormat);
-    if (!settings.value("initial_setup_done", false).toBool()) {
-        runInitialSetup();
-    }
 }
 
 void MainWindow::sendHeartbeat() {
@@ -3271,153 +3248,3 @@ void MainWindow::checkAppUpdate() {
     });
 }
 
-void MainWindow::runInitialSetup() {
-    QWidget* overlay = new QWidget(this);
-    overlay->setStyleSheet("background-color: rgba(10, 10, 15, 240);");
-    overlay->setGeometry(rect());
-    overlay->show();
-
-    QVBoxLayout* layout = new QVBoxLayout(overlay);
-    layout->setAlignment(Qt::AlignCenter);
-
-    QLabel* title = new QLabel("Setting up your Steam Environment", overlay);
-    title->setStyleSheet("font-size: 28px; font-weight: bold; color: white; background: transparent;");
-    title->setAlignment(Qt::AlignCenter);
-
-    QLabel* status = new QLabel("Initializing...", overlay);
-    status->setStyleSheet("font-size: 16px; color: #A8DB8F; background: transparent; margin-top: 20px;");
-    status->setAlignment(Qt::AlignCenter);
-
-    LoadingSpinner* spinner = new LoadingSpinner(overlay);
-    spinner->setFixedSize(60, 60);
-
-    layout->addStretch();
-    layout->addWidget(title, 0, Qt::AlignCenter);
-    layout->addSpacing(30);
-    layout->addWidget(spinner, 0, Qt::AlignCenter);
-    layout->addWidget(status, 0, Qt::AlignCenter);
-    layout->addStretch();
-
-    overlay->raise();
-    overlay->installEventFilter(this); // Intercept events so user can't click through
-
-    status->setText("Optimizing Steam Auto-Start...");
-    QCoreApplication::processEvents();
-
-    // 1. Remove standard Registry Run Key (Steam keeps re-creating this with wrong CWD)
-    QSettings reg("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
-    reg.remove("Steam");
-
-    // 2. Create Steam shortcut in Startup folder with correct Working Directory
-    QString steamExePath = Config::getSteamExePath().replace('/', '\\');
-    QString steamDirPath = Config::getSteamDir().replace('/', '\\');
-    QString psScript = 
-        "$WshShell = New-Object -comObject WScript.Shell;"
-        "$Shortcut = $WshShell.CreateShortcut([Environment]::GetFolderPath('Startup') + '\\Steam.lnk');"
-        "$Shortcut.TargetPath = '" + steamExePath + "';"
-        "$Shortcut.Arguments = '-silent';"
-        "$Shortcut.WorkingDirectory = '" + steamDirPath + "';"
-        "$Shortcut.Save();";
-        
-    QProcess* ps = new QProcess(this);
-    ps->start("powershell", QStringList() << "-NoProfile" << "-Command" << psScript);
-    ps->waitForFinished();
-    ps->deleteLater();
-
-    // 3. Create LuaPatcher auto-fix shortcut in Startup folder
-    // This is the safety net: even if Steam re-adds its own broken auto-start,
-    // LuaPatcher will run silently with --auto-fix, wait for Steam to start,
-    // then restart it with the correct working directory.
-    QString luaPatcherExe = QCoreApplication::applicationFilePath().replace('/', '\\');
-    QString luaPatcherDir = QCoreApplication::applicationDirPath().replace('/', '\\');
-    QString psScript2 = 
-        "$WshShell = New-Object -comObject WScript.Shell;"
-        "$Shortcut = $WshShell.CreateShortcut([Environment]::GetFolderPath('Startup') + '\\LuaPatcher AutoFix.lnk');"
-        "$Shortcut.TargetPath = '" + luaPatcherExe + "';"
-        "$Shortcut.Arguments = '--auto-fix';"
-        "$Shortcut.WorkingDirectory = '" + luaPatcherDir + "';"
-        "$Shortcut.WindowStyle = 7;"  // 7 = Minimized/Hidden
-        "$Shortcut.Save();";
-        
-    QProcess* ps2 = new QProcess(this);
-    ps2->start("powershell", QStringList() << "-NoProfile" << "-Command" << psScript2);
-    ps2->waitForFinished();
-    ps2->deleteLater();
-
-    // 4. Hijack Desktop and Start Menu shortcuts
-    // This makes the "default startup" open via Lua Patcher's sanitization method
-    status->setText("Optimizing Steam Shortcuts...");
-    QCoreApplication::processEvents();
-    
-    // Write a temp PowerShell script to avoid escaping issues with $ and %
-    QString tempScript = QDir::tempPath() + "/luapatcher_hijack.ps1";
-    QFile scriptFile(tempScript);
-    if (scriptFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QTextStream out(&scriptFile);
-        out << "$WshShell = New-Object -ComObject WScript.Shell\n";
-        out << "$paths = @(\n";
-        out << "    [Environment]::GetFolderPath('Desktop'),\n";
-        out << "    [Environment]::GetFolderPath('Programs'),\n";
-        out << "    [Environment]::GetFolderPath('CommonDesktopDirectory'),\n";
-        out << "    [Environment]::GetFolderPath('CommonPrograms')\n";
-        out << ")\n";
-        out << "foreach ($path in $paths) {\n";
-        out << "    if (-not (Test-Path $path)) { continue }\n";
-        out << "    Get-ChildItem -Path $path -Filter '*Steam*.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {\n";
-        out << "        $shortcut = $WshShell.CreateShortcut($_.FullName)\n";
-        out << "        if ($shortcut.TargetPath -match 'steam\\.exe$') {\n";
-        out << "            $shortcut.TargetPath = '" << luaPatcherExe << "'\n";
-        out << "            $shortcut.Arguments = '--launch-steam'\n";
-        out << "            $shortcut.WorkingDirectory = '" << luaPatcherDir << "'\n";
-        out << "            $shortcut.IconLocation = '" << steamExePath << ", 0'\n";
-        out << "            $shortcut.Save()\n";
-        out << "        }\n";
-        out << "    }\n";
-        out << "}\n";
-        scriptFile.close();
-    }
-
-    QProcess* ps3 = new QProcess(this);
-    ps3->start("powershell", QStringList() << "-ExecutionPolicy" << "Bypass" << "-NoProfile" << "-File" << tempScript);
-    ps3->waitForFinished(15000);
-    ps3->deleteLater();
-    QFile::remove(tempScript); // Clean up
-
-    // 5. Patch Steam Payload
-    status->setText("Installing Steam DRM Patch payload...");
-    QCoreApplication::processEvents();
-
-    if (!m_steamPatchWorker) {
-        m_steamPatchWorker = new SteamPatchWorker(this);
-    }
-    
-    // Disconnect old connections to prevent duplicates
-    m_steamPatchWorker->disconnect();
-    
-    connect(m_steamPatchWorker, &SteamPatchWorker::log, this, [status](QString msg, QString level) {
-        status->setText(msg);
-    });
-    
-    connect(m_steamPatchWorker, &SteamPatchWorker::finished, this, [this, overlay]() {
-        QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-        QString settingsPath = appDataPath + "/settings.ini";
-        QSettings settings(settingsPath, QSettings::IniFormat);
-        settings.setValue("initial_setup_done", true);
-        
-        overlay->deleteLater();
-    });
-    
-    connect(m_steamPatchWorker, &SteamPatchWorker::error, this, [status](QString errorMsg) {
-        status->setText("Error: " + errorMsg);
-        status->setStyleSheet("color: #F2B8B5; font-size: 16px; background: transparent; margin-top: 10px;");
-        
-        // Even if payload patch fails, let them proceed after a delay
-        QTimer::singleShot(3000, status, [status]() {
-            if (status && status->parentWidget()) {
-                status->parentWidget()->deleteLater();
-            }
-        });
-    });
-    
-    m_steamPatchWorker->start();
-}

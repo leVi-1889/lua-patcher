@@ -1,11 +1,7 @@
 #include "mainwindow.h"
 #include "utils/colors.h"
 #include "onboardingdialog.h"
-#include "workers/restartworker.h"
 #include <QApplication>
-#include <QProcess>
-#include <QThread>
-#include <QEventLoop>
 #include <QFont>
 #include <QSettings>
 #include <QJsonDocument>
@@ -145,64 +141,6 @@ int main(int argc, char *argv[]) {
     app.setStyle("Fusion");
     app.setStyleSheet(getStyleSheet());
     
-    // Auto-fix mode for Windows Startup
-    if (argc > 1 && QString(argv[1]) == "--auto-fix") {
-        qDebug() << "Auto-fix mode: Waiting for Steam to start...";
-        
-        // Step 1: Remove Steam's own broken registry Run key (it keeps re-adding it)
-        QSettings reg("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
-        reg.remove("Steam");
-        
-        // Step 2: Wait for Steam to actually be running (up to 90 seconds)
-        bool steamFound = false;
-        for (int i = 0; i < 90; ++i) {
-            QProcess checkProc;
-            checkProc.start("tasklist", QStringList() << "/FI" << "IMAGENAME eq steam.exe" << "/NH");
-            checkProc.waitForFinished(3000);
-            QString output = QString::fromLocal8Bit(checkProc.readAllStandardOutput());
-            if (output.contains("steam.exe", Qt::CaseInsensitive)) {
-                steamFound = true;
-                break;
-            }
-            QThread::sleep(1);
-        }
-        
-        if (!steamFound) {
-            qDebug() << "Auto-fix: Steam never started. Exiting.";
-            return 0;
-        }
-        
-        // Step 3: Give Steam time to fully initialize (load UI, sync library)
-        qDebug() << "Auto-fix: Steam detected. Waiting for initialization...";
-        QThread::sleep(15);
-        
-        // Step 4: Restart Steam with correct working directory
-        qDebug() << "Auto-fix: Restarting Steam with correct environment...";
-        RestartWorker* worker = new RestartWorker();
-        QEventLoop loop;
-        QObject::connect(worker, &RestartWorker::finished, &loop, &QEventLoop::quit);
-        QObject::connect(worker, &RestartWorker::error, &loop, &QEventLoop::quit);
-        worker->start();
-        loop.exec();
-        
-        qDebug() << "Auto-fix: Done. Exiting.";
-        return 0;
-    }
-
-    // Direct Launch mode (For replacing Desktop Shortcuts)
-    if (argc > 1 && QString(argv[1]) == "--launch-steam") {
-        qDebug() << "Direct Launch mode: Sanitizing and starting Steam...";
-        
-        RestartWorker* worker = new RestartWorker();
-        QEventLoop loop;
-        QObject::connect(worker, &RestartWorker::finished, &loop, &QEventLoop::quit);
-        QObject::connect(worker, &RestartWorker::error, &loop, &QEventLoop::quit);
-        worker->start();
-        loop.exec();
-        
-        return 0; // Exit silently after launching
-    }
-
     qDebug() << "Step 4: Setting up fonts";
     QFont font("Oswald");
     if (!QFontInfo(font).exactMatch()) {

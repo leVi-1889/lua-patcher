@@ -155,7 +155,6 @@ private:
     void enableAcrylicBlur();
     void updateHeroIndicators();
     void jumpToHeroSlide(int index);
-    void runInitialSetup();
 
     // UI Components
     QString m_username;
