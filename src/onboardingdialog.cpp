@@ -376,7 +376,7 @@ void OnboardingDialog::paintEvent(QPaintEvent*) {
     p.setClipPath(clipPath);
     
     // Draw full background (dark navy)
-    p.fillRect(rect(), QColor(25, 35, 50));
+    p.fillRect(rect(), QColor("#0a0d36"));
     
     // Draw left panel image
     if (!m_bgImage.isNull()) {
@@ -389,13 +389,13 @@ void OnboardingDialog::paintEvent(QPaintEvent*) {
         // Subtle dark gradient overlay on the right edge of the image for blending
         QLinearGradient fadeGrad(leftRect.right() - 60, 0, leftRect.right(), 0);
         fadeGrad.setColorAt(0, Qt::transparent);
-        fadeGrad.setColorAt(1, QColor(25, 35, 50));
+        fadeGrad.setColorAt(1, QColor("#0a0d36"));
         p.fillRect(leftRect.right() - 60, 0, 60, height(), fadeGrad);
     }
     
     // Draw right panel background (slightly different shade for depth)
     QRect rightRect(360, 0, width() - 360, height());
-    p.fillRect(rightRect, QColor(25, 35, 50));
+    p.fillRect(rightRect, QColor("#0a0d36"));
     
     // Outer border
     p.setPen(QPen(QColor(255,255,255,20), 1.5));
