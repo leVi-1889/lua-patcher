@@ -9,6 +9,7 @@
 #include <QSettings>
 #include <QDateTime>
 #include <QCoreApplication>
+#include <QStandardPaths>
 
 RestartWorker::RestartWorker(QObject* parent)
     : QThread(parent)
@@ -33,8 +34,9 @@ static QString getRunningProcesses(const QStringList& names) {
 }
 
 void RestartWorker::run() {
-    // Setup log file in the app's own directory
-    QString logPath = QCoreApplication::applicationDirPath() + "/restart_debug.log";
+    // Setup log file on the user's Desktop to avoid UAC write permission issues
+    QString desktopPath = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+    QString logPath = QDir(desktopPath).filePath("luapatcher_restart_debug.txt");
     QFile logFile(logPath);
     
     // Append to existing log so we can compare multiple restarts
