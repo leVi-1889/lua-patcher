@@ -6,6 +6,8 @@
 #include <QGraphicsDropShadowEffect>
 #include <QPainter>
 #include <QPainterPath>
+#include <QByteArray>
+#include <QPixmap>
 
 ChatPage::ChatPage(const QString& myUsername, const QString& friendUsername, const QString& friendAvatarBase64, QNetworkAccessManager* netMgr, QWidget* parent)
     : QWidget(parent)
