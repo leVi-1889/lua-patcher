@@ -82,10 +82,10 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
     mainLayout->setSpacing(0);
     
     // ── Left Panel (Image) ──
-    QWidget* leftPanel = new QWidget(this);
-    leftPanel->setFixedWidth(360);
-    leftPanel->setStyleSheet("background: transparent;");
-    mainLayout->addWidget(leftPanel);
+    m_leftPanel = new QWidget(this);
+    m_leftPanel->setFixedWidth(360);
+    m_leftPanel->setStyleSheet("background: transparent;");
+    mainLayout->addWidget(m_leftPanel);
     
     // ── Right Panel (Form) ──
     m_rightPanel = new QWidget(this);
@@ -516,36 +516,13 @@ void OnboardingDialog::onLoadingUpdate() {
 }
 
 void OnboardingDialog::showLoadingView() {
-    // Hide right panel widgets
-    m_tabSignIn->hide();
-    m_tabSignUp->hide();
-    m_usernameInput->hide();
-    m_passwordInput->hide();
-    m_statusLabel->hide();
-    m_continueBtn->hide();
-    m_guestBtn->hide();
-    
-    // Recursively hide all children in right panel
-    for (QObject* child : m_rightPanel->children()) {
-        QWidget* w = qobject_cast<QWidget*>(child);
-        if (w) w->hide();
-    }
+    m_leftPanel->hide();
+    m_rightPanel->hide();
 }
 
 void OnboardingDialog::hideLoadingView() {
-    // Restore primary widgets
-    m_tabSignIn->show();
-    m_tabSignUp->show();
-    m_usernameInput->show();
-    m_passwordInput->show();
-    m_statusLabel->show();
-    m_continueBtn->show();
-    m_guestBtn->show();
-
-    for (QObject* child : m_rightPanel->children()) {
-        QWidget* w = qobject_cast<QWidget*>(child);
-        if (w) w->show();
-    }
+    m_leftPanel->show();
+    m_rightPanel->show();
     
     m_continueBtn->setEnabled(true);
     if (m_currentMode == LOGIN) {

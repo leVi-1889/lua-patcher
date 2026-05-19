@@ -49,6 +49,7 @@ private:
   int m_currentMode;
 
   // UI
+  QWidget *m_leftPanel;
   QWidget *m_rightPanel;
   QLabel *m_tabSignIn;
   QLabel *m_tabSignUp;
