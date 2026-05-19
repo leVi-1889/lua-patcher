@@ -10,10 +10,14 @@
 #include <QApplication>
 #include <QScreen>
 #include <QPainterPath>
+#include <QDir>
+#include <QFile>
+#include <QFrame>
+#include <QCoreApplication>
 
 OnboardingDialog::OnboardingDialog(QWidget* parent)
     : QDialog(parent)
-    , m_currentMode(WELCOME)
+    , m_currentMode(LOGIN)
     , m_isAvailable(false)
     , m_isChecking(false)
     , m_isGuest(false)
@@ -24,163 +28,241 @@ OnboardingDialog::OnboardingDialog(QWidget* parent)
     
     QScreen* screen = QApplication::primaryScreen();
     QRect screenGeometry = screen->availableGeometry();
-    int w = 500;
-    int h = 600;
+    int w = 860;
+    int h = 520;
     setFixedSize(w, h);
     move(screenGeometry.center() - QPoint(w/2, h/2));
     
+    // Load background image
+    QString imgPath = QCoreApplication::applicationDirPath() + "/login_bg.png";
+    if (QFile::exists(imgPath)) {
+        m_bgImage.load(imgPath);
+    }
+    
+    // Network
     m_networkManager = new QNetworkAccessManager(this);
     m_debounceTimer = new QTimer(this);
     m_debounceTimer->setSingleShot(true);
-    m_debounceTimer->setInterval(300); // Faster check
+    m_debounceTimer->setInterval(300);
     connect(m_debounceTimer, &QTimer::timeout, this, &OnboardingDialog::checkAvailability);
     connect(m_networkManager, &QNetworkAccessManager::finished, this, &OnboardingDialog::onCheckFinished);
     
-    QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(40, 40, 40, 40);
+    // ── Main horizontal layout ──
+    QHBoxLayout* mainLayout = new QHBoxLayout(this);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
-
-    // ── Welcome View ──
-    m_welcomeView = new QWidget(this);
-    QVBoxLayout* welcomeLayout = new QVBoxLayout(m_welcomeView);
-    welcomeLayout->setContentsMargins(0, 0, 0, 0);
-    welcomeLayout->setSpacing(12);
-
-    QLabel* logoLbl = new QLabel("⚙");
-    logoLbl->setAlignment(Qt::AlignCenter);
-    logoLbl->setStyleSheet("font-size: 64px; color: #D0BCFF; margin-bottom: 20px;");
-    welcomeLayout->addWidget(logoLbl);
-
-    QLabel* welcomeTitle = new QLabel("Lua Patcher");
-    welcomeTitle->setAlignment(Qt::AlignCenter);
-    welcomeTitle->setStyleSheet("font-size: 32px; font-weight: 800; color: #FFFFFF; font-family: 'Segoe UI';");
-    welcomeLayout->addWidget(welcomeTitle);
-
-    QLabel* welcomeSub = new QLabel("Experience the next generation of patching");
-    welcomeSub->setAlignment(Qt::AlignCenter);
-    welcomeSub->setStyleSheet("font-size: 14px; color: rgba(255,255,255,160); margin-bottom: 40px;");
-    welcomeLayout->addWidget(welcomeSub);
-
-    auto createMenuBtn = [this](const QString& text, const QString& bg, const QString& fg) {
-        QPushButton* btn = new QPushButton(text);
-        btn->setFixedHeight(54);
-        btn->setCursor(Qt::PointingHandCursor);
-        btn->setStyleSheet(QString(
-            "QPushButton {"
-            "  background: %1; color: %2; border-radius: 16px; font-size: 16px; font-weight: bold; border: none;"
-            "}"
-            "QPushButton:hover { background: rgba(255,255,255,20); }"
-        ).arg(bg).arg(fg));
-        return btn;
-    };
-
-    QPushButton* loginBtn = createMenuBtn("LOGIN", "rgba(255,255,255,15)", "#FFFFFF");
-    QPushButton* signupBtn = createMenuBtn("SIGN UP", Colors::PRIMARY, Colors::ON_PRIMARY);
-    QPushButton* guestBtn = createMenuBtn("CONTINUE AS GUEST", "transparent", "rgba(255,255,255,120)");
     
-    welcomeLayout->addWidget(signupBtn);
-    welcomeLayout->addWidget(loginBtn);
-    welcomeLayout->addSpacing(10);
-    welcomeLayout->addWidget(guestBtn);
-    welcomeLayout->addStretch();
-
-    connect(loginBtn, &QPushButton::clicked, this, [this](){ switchMode(LOGIN); });
-    connect(signupBtn, &QPushButton::clicked, this, [this](){ switchMode(REGISTER); });
-    connect(guestBtn, &QPushButton::clicked, this, &OnboardingDialog::onGuestClicked);
-
-    mainLayout->addWidget(m_welcomeView);
-
-    // ── Form View (Login/Register) ──
-    m_formView = new QWidget(this);
-    QVBoxLayout* formLayout = new QVBoxLayout(m_formView);
-    formLayout->setContentsMargins(0, 0, 0, 0);
+    // ── Left Panel (Image) ──
+    QWidget* leftPanel = new QWidget(this);
+    leftPanel->setFixedWidth(360);
+    leftPanel->setStyleSheet("background: transparent;");
+    mainLayout->addWidget(leftPanel);
+    
+    // ── Right Panel (Form) ──
+    m_rightPanel = new QWidget(this);
+    m_rightPanel->setStyleSheet("background: transparent;");
+    mainLayout->addWidget(m_rightPanel);
+    
+    QVBoxLayout* formLayout = new QVBoxLayout(m_rightPanel);
+    formLayout->setContentsMargins(45, 45, 45, 35);
     formLayout->setSpacing(0);
-
-    m_backBtn = new QPushButton("← BACK");
-    m_backBtn->setCursor(Qt::PointingHandCursor);
-    m_backBtn->setStyleSheet("QPushButton { background: transparent; color: #8FABD4; border: none; font-weight: bold; font-size: 13px; text-align: left; }");
-    connect(m_backBtn, &QPushButton::clicked, this, [this](){ switchMode(WELCOME); });
-    formLayout->addWidget(m_backBtn);
-    formLayout->addSpacing(30);
-
-    m_titleLabel = new QLabel("Create Account");
-    m_titleLabel->setStyleSheet("font-size: 28px; font-weight: bold; color: #FFFFFF;");
-    formLayout->addWidget(m_titleLabel);
-
-    m_subtitleLabel = new QLabel("Set up your unique identity");
-    m_subtitleLabel->setStyleSheet("font-size: 14px; color: rgba(255,255,255,160); margin-bottom: 30px;");
-    formLayout->addWidget(m_subtitleLabel);
-
-    auto createInput = [](const QString& ph, bool password = false) {
-        QLineEdit* le = new QLineEdit();
-        le->setPlaceholderText(ph);
-        le->setFixedHeight(52);
-        if (password) le->setEchoMode(QLineEdit::Password);
-        le->setStyleSheet(
-            "QLineEdit {"
-            "  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);"
-            "  border-radius: 14px; color: white; padding: 0 16px; font-size: 15px;"
-            "}"
-            "QLineEdit:focus { border-color: #D0BCFF; background: rgba(255,255,255,0.12); }"
-        );
-        return le;
-    };
-
-    m_usernameInput = createInput("Username");
-    m_passwordInput = createInput("Password", true);
     
-    connect(m_usernameInput, &QLineEdit::returnPressed, this, &OnboardingDialog::onPrimaryClicked);
-    connect(m_passwordInput, &QLineEdit::returnPressed, this, &OnboardingDialog::onPrimaryClicked);
+    // ── Tab Row: Sign In | Sign Up ──
+    QHBoxLayout* tabRow = new QHBoxLayout();
+    tabRow->setSpacing(30);
+    tabRow->setAlignment(Qt::AlignLeft);
     
+    m_tabSignIn = new QLabel("Sign In");
+    m_tabSignIn->setCursor(Qt::PointingHandCursor);
+    m_tabSignIn->setStyleSheet(
+        "font-size: 22px; font-weight: bold; color: #FFFFFF; font-family: 'Segoe UI';"
+        "padding-bottom: 6px;"
+    );
+    
+    m_tabSignUp = new QLabel("Sign Up");
+    m_tabSignUp->setCursor(Qt::PointingHandCursor);
+    m_tabSignUp->setStyleSheet(
+        "font-size: 22px; font-weight: normal; color: rgba(255,255,255,100); font-family: 'Segoe UI';"
+        "padding-bottom: 6px;"
+    );
+    
+    // Make tabs clickable via event filter
+    m_tabSignIn->installEventFilter(this);
+    m_tabSignUp->installEventFilter(this);
+    
+    tabRow->addWidget(m_tabSignIn);
+    tabRow->addWidget(m_tabSignUp);
+    tabRow->addStretch();
+    formLayout->addLayout(tabRow);
+    formLayout->addSpacing(40);
+    
+    // ── Username Input ──
+    QLabel* userLabel = new QLabel("Your username");
+    userLabel->setStyleSheet("font-size: 12px; color: rgba(255,255,255,100); font-family: 'Segoe UI'; margin-bottom: 2px;");
+    formLayout->addWidget(userLabel);
+    
+    m_usernameInput = new QLineEdit();
+    m_usernameInput->setPlaceholderText("Enter username");
+    m_usernameInput->setFixedHeight(38);
+    m_usernameInput->setStyleSheet(
+        "QLineEdit {"
+        "  background: transparent; border: none; border-bottom: 1.5px solid rgba(255,255,255,30);"
+        "  color: white; padding: 4px 0px; font-size: 15px; font-family: 'Segoe UI';"
+        "}"
+        "QLineEdit:focus { border-bottom: 1.5px solid #00D4FF; }"
+        "QLineEdit::placeholder { color: rgba(255,255,255,40); }"
+    );
     formLayout->addWidget(m_usernameInput);
-    formLayout->addSpacing(12);
+    formLayout->addSpacing(22);
+    
+    // ── Password Input ──
+    QLabel* passLabel = new QLabel("Your password");
+    passLabel->setStyleSheet("font-size: 12px; color: rgba(255,255,255,100); font-family: 'Segoe UI'; margin-bottom: 2px;");
+    formLayout->addWidget(passLabel);
+    
+    m_passwordInput = new QLineEdit();
+    m_passwordInput->setPlaceholderText("Enter password");
+    m_passwordInput->setEchoMode(QLineEdit::Password);
+    m_passwordInput->setFixedHeight(38);
+    m_passwordInput->setStyleSheet(
+        "QLineEdit {"
+        "  background: transparent; border: none; border-bottom: 1.5px solid rgba(255,255,255,30);"
+        "  color: white; padding: 4px 0px; font-size: 15px; font-family: 'Segoe UI';"
+        "}"
+        "QLineEdit:focus { border-bottom: 1.5px solid #00D4FF; }"
+        "QLineEdit::placeholder { color: rgba(255,255,255,40); }"
+    );
     formLayout->addWidget(m_passwordInput);
     
+    // ── Status Label ──
     m_statusLabel = new QLabel("");
     m_statusLabel->setStyleSheet("font-size: 12px; margin-top: 8px; color: #F2B8B5;");
     m_statusLabel->setWordWrap(true);
     formLayout->addWidget(m_statusLabel);
     
-    formLayout->addSpacing(30);
-
-    m_continueBtn = new QPushButton("REGISTER");
-    m_continueBtn->setFixedHeight(54);
-    m_continueBtn->setCursor(Qt::PointingHandCursor);
-    m_continueBtn->setStyleSheet(QString(
-        "QPushButton {"
-        "  background: %1; color: %2; border-radius: 16px; font-size: 16px; font-weight: bold; border: none;"
-        "}"
-        "QPushButton:hover { background: %3; }"
-        "QPushButton:disabled { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }"
-    ).arg(Colors::PRIMARY).arg(Colors::ON_PRIMARY).arg(Colors::PRIMARY_CONTAINER));
+    formLayout->addSpacing(28);
     
+    // ── Primary Button (SIGN IN / SIGN UP) ──
+    m_continueBtn = new QPushButton("SIGN IN");
+    m_continueBtn->setFixedHeight(48);
+    m_continueBtn->setCursor(Qt::PointingHandCursor);
+    m_continueBtn->setStyleSheet(
+        "QPushButton {"
+        "  background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00B4D8, stop:1 #00D4FF);"
+        "  color: #FFFFFF; border-radius: 24px; font-size: 14px; font-weight: bold;"
+        "  font-family: 'Segoe UI'; border: none; letter-spacing: 1px;"
+        "}"
+        "QPushButton:hover {"
+        "  background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00C4E8, stop:1 #00E4FF);"
+        "}"
+        "QPushButton:disabled {"
+        "  background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.3);"
+        "}"
+    );
+    formLayout->addWidget(m_continueBtn);
+    
+    formLayout->addSpacing(16);
+    
+    // ── "or" divider ──
+    QHBoxLayout* orRow = new QHBoxLayout();
+    auto makeLine = [this]() {
+        QFrame* line = new QFrame(this);
+        line->setFrameShape(QFrame::HLine);
+        line->setStyleSheet("background: rgba(255,255,255,15); max-height: 1px;");
+        return line;
+    };
+    QLabel* orLabel = new QLabel("or");
+    orLabel->setStyleSheet("font-size: 12px; color: rgba(255,255,255,80); font-family: 'Segoe UI'; padding: 0 12px;");
+    orLabel->setAlignment(Qt::AlignCenter);
+    orRow->addWidget(makeLine());
+    orRow->addWidget(orLabel);
+    orRow->addWidget(makeLine());
+    formLayout->addLayout(orRow);
+    
+    formLayout->addSpacing(16);
+    
+    // ── Guest Button ──
+    m_guestBtn = new QPushButton("CONTINUE AS GUEST");
+    m_guestBtn->setFixedHeight(48);
+    m_guestBtn->setCursor(Qt::PointingHandCursor);
+    m_guestBtn->setStyleSheet(
+        "QPushButton {"
+        "  background: transparent;"
+        "  color: #00D4FF; border-radius: 24px; font-size: 13px; font-weight: bold;"
+        "  font-family: 'Segoe UI'; border: 1.5px solid rgba(0,212,255,0.4); letter-spacing: 1px;"
+        "}"
+        "QPushButton:hover {"
+        "  background: rgba(0,212,255,0.08); border-color: rgba(0,212,255,0.7);"
+        "}"
+    );
+    formLayout->addWidget(m_guestBtn);
+    
+    formLayout->addStretch();
+    
+    // ── Footer ──
+    QLabel* footer = new QLabel("Privacy · Terms · About");
+    footer->setAlignment(Qt::AlignCenter);
+    footer->setStyleSheet("font-size: 11px; color: rgba(255,255,255,60); font-family: 'Segoe UI';");
+    formLayout->addWidget(footer);
+    
+    // ── Connections ──
+    connect(m_usernameInput, &QLineEdit::returnPressed, this, &OnboardingDialog::onPrimaryClicked);
+    connect(m_passwordInput, &QLineEdit::returnPressed, this, &OnboardingDialog::onPrimaryClicked);
     connect(m_usernameInput, &QLineEdit::textChanged, this, &OnboardingDialog::onUsernameChanged);
     connect(m_continueBtn, &QPushButton::clicked, this, &OnboardingDialog::onPrimaryClicked);
-    formLayout->addWidget(m_continueBtn);
-    formLayout->addStretch();
-
-    mainLayout->addWidget(m_formView);
-    m_formView->hide();
+    connect(m_guestBtn, &QPushButton::clicked, this, &OnboardingDialog::onGuestClicked);
+    
+    m_usernameInput->setFocus();
 }
 
-void OnboardingDialog::switchMode(int mode) {
-    m_currentMode = mode;
+// ── Event filter for tab clicks ──
+bool OnboardingDialog::eventFilter(QObject* obj, QEvent* event) {
+    if (event->type() == QEvent::MouseButtonPress) {
+        if (obj == m_tabSignIn) {
+            switchToLogin();
+            return true;
+        } else if (obj == m_tabSignUp) {
+            switchToRegister();
+            return true;
+        }
+    }
+    return QDialog::eventFilter(obj, event);
+}
+
+void OnboardingDialog::switchToLogin() {
+    m_currentMode = LOGIN;
     m_statusLabel->setText("");
     m_usernameInput->clear();
     m_passwordInput->clear();
+    
+    m_tabSignIn->setStyleSheet(
+        "font-size: 22px; font-weight: bold; color: #FFFFFF; font-family: 'Segoe UI'; padding-bottom: 6px;"
+    );
+    m_tabSignUp->setStyleSheet(
+        "font-size: 22px; font-weight: normal; color: rgba(255,255,255,100); font-family: 'Segoe UI'; padding-bottom: 6px;"
+    );
+    
+    m_continueBtn->setText("SIGN IN");
+    m_continueBtn->setEnabled(true);
+    m_usernameInput->setFocus();
+}
 
-    if (mode == WELCOME) {
-        m_welcomeView->show();
-        m_formView->hide();
-    } else {
-        m_welcomeView->hide();
-        m_formView->show();
-        m_titleLabel->setText(mode == LOGIN ? "Welcome Back" : "Sign Up");
-        m_subtitleLabel->setText(mode == LOGIN ? "Log in to sync your level and avatar" : "Register to track your stats and level up");
-        m_continueBtn->setText(mode == LOGIN ? "LOGIN" : "SIGN UP");
-        m_continueBtn->setEnabled(mode == LOGIN); // Login always enabled, Register needs check
-        m_usernameInput->setFocus();
-    }
+void OnboardingDialog::switchToRegister() {
+    m_currentMode = REGISTER;
+    m_statusLabel->setText("");
+    m_usernameInput->clear();
+    m_passwordInput->clear();
+    
+    m_tabSignIn->setStyleSheet(
+        "font-size: 22px; font-weight: normal; color: rgba(255,255,255,100); font-family: 'Segoe UI'; padding-bottom: 6px;"
+    );
+    m_tabSignUp->setStyleSheet(
+        "font-size: 22px; font-weight: bold; color: #FFFFFF; font-family: 'Segoe UI'; padding-bottom: 6px;"
+    );
+    
+    m_continueBtn->setText("SIGN UP");
+    m_continueBtn->setEnabled(false); // Needs username check
+    m_usernameInput->setFocus();
 }
 
 void OnboardingDialog::onGuestClicked() {
@@ -280,18 +362,46 @@ void OnboardingDialog::onAuthFinished(QNetworkReply* reply) {
         m_statusLabel->setText("✗ " + errorMsg);
         m_statusLabel->setStyleSheet("color: #F2B8B5;");
         m_continueBtn->setEnabled(true);
-        m_continueBtn->setText(m_currentMode == LOGIN ? "LOGIN" : "SIGN UP");
+        m_continueBtn->setText(m_currentMode == LOGIN ? "SIGN IN" : "SIGN UP");
     }
 }
 
 void OnboardingDialog::paintEvent(QPaintEvent*) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    QPainterPath path;
-    path.addRoundedRect(rect(), 24, 24);
-    p.fillPath(path, QColor(15, 18, 28, 250));
-    p.setPen(QPen(QColor(255,255,255,30), 1.5));
-    p.drawPath(path);
+    
+    int radius = 20;
+    QPainterPath clipPath;
+    clipPath.addRoundedRect(rect(), radius, radius);
+    p.setClipPath(clipPath);
+    
+    // Draw full background (dark navy)
+    p.fillRect(rect(), QColor(25, 35, 50));
+    
+    // Draw left panel image
+    if (!m_bgImage.isNull()) {
+        QRect leftRect(0, 0, 360, height());
+        QPixmap scaled = m_bgImage.scaled(leftRect.size(), Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+        int xOff = (scaled.width() - leftRect.width()) / 2;
+        int yOff = (scaled.height() - leftRect.height()) / 2;
+        p.drawPixmap(leftRect, scaled, QRect(xOff, yOff, leftRect.width(), leftRect.height()));
+        
+        // Subtle dark gradient overlay on the right edge of the image for blending
+        QLinearGradient fadeGrad(leftRect.right() - 60, 0, leftRect.right(), 0);
+        fadeGrad.setColorAt(0, Qt::transparent);
+        fadeGrad.setColorAt(1, QColor(25, 35, 50));
+        p.fillRect(leftRect.right() - 60, 0, 60, height(), fadeGrad);
+    }
+    
+    // Draw right panel background (slightly different shade for depth)
+    QRect rightRect(360, 0, width() - 360, height());
+    p.fillRect(rightRect, QColor(25, 35, 50));
+    
+    // Outer border
+    p.setPen(QPen(QColor(255,255,255,20), 1.5));
+    QPainterPath borderPath;
+    borderPath.addRoundedRect(rect().adjusted(0.5, 0.5, -0.5, -0.5), radius, radius);
+    p.drawPath(borderPath);
 }
 
 QString OnboardingDialog::username() const { return m_username; }

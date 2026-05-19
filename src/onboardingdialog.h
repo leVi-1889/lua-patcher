@@ -10,6 +10,8 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QPainter>
+#include <QPixmap>
+#include <QEvent>
 
 class OnboardingDialog : public QDialog {
     Q_OBJECT
@@ -21,6 +23,7 @@ public:
 
 protected:
     void paintEvent(QPaintEvent* event) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:
     void onUsernameChanged(const QString& text);
@@ -28,24 +31,29 @@ private slots:
     void onCheckFinished(QNetworkReply* reply);
     void onPrimaryClicked();
     void onAuthFinished(QNetworkReply* reply);
-    void switchMode(int mode);
+    void switchToLogin();
+    void switchToRegister();
     void onGuestClicked();
 
 private:
-    enum Mode { WELCOME, LOGIN, REGISTER };
+    enum Mode { LOGIN, REGISTER };
     int m_currentMode;
 
-    QWidget* m_welcomeView;
-    QWidget* m_formView;
+    // UI
+    QWidget* m_rightPanel;
+    QLabel* m_tabSignIn;
+    QLabel* m_tabSignUp;
 
     QLineEdit* m_usernameInput;
     QLineEdit* m_passwordInput;
     QLabel* m_statusLabel;
-    QLabel* m_titleLabel;
-    QLabel* m_subtitleLabel;
     QPushButton* m_continueBtn;
-    QPushButton* m_backBtn;
+    QPushButton* m_guestBtn;
 
+    // Image
+    QPixmap m_bgImage;
+
+    // Network
     QTimer* m_debounceTimer;
     QNetworkAccessManager* m_networkManager;
     QString m_username;

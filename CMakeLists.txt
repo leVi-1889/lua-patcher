@@ -174,4 +174,7 @@ add_custom_command(TARGET LuaPatcher POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${CMAKE_SOURCE_DIR}/icon.png"
     "$<TARGET_FILE_DIR:LuaPatcher>/icon.png"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_SOURCE_DIR}/login_bg.png"
+    "$<TARGET_FILE_DIR:LuaPatcher>/login_bg.png"
 )
