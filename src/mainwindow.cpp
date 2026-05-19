@@ -3002,6 +3002,10 @@ void MainWindow::refreshFriendsList() {
     });
 }
 
+void MainWindow::openChat(const QString& friendUsername) {
+    openChat(friendUsername, "");
+}
+
 void MainWindow::openChat(const QString& friendUsername, const QString& avatarUrl) {
     if (!m_chatPage) return;
     

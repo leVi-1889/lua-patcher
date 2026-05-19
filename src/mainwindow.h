@@ -122,6 +122,7 @@ private slots:
     
     // Chat & Social
     void openChat(const QString& friendUsername);
+    void openChat(const QString& friendUsername, const QString& avatarUrl);
     void onChatBack();
     void removeFriend(const QString& friendUsername);
 
