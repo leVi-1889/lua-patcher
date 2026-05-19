@@ -57,7 +57,6 @@ set(SOURCES
     src/chatpage.cpp
     src/friendpopover.cpp
     src/userprofiledialog.cpp
-    src/loadingdialog.cpp
 )
 
 set(HEADERS
@@ -83,7 +82,6 @@ set(HEADERS
     src/chatpage.h
     src/friendpopover.h
     src/userprofiledialog.h
-    src/loadingdialog.h
 )
 
 # Add static plugin initialization for static builds

@@ -12,6 +12,8 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QTimer>
+#include <QElapsedTimer>
+#include "workers/steampatchworker.h"
 
 class OnboardingDialog : public QDialog {
   Q_OBJECT
@@ -24,6 +26,7 @@ public:
 protected:
   void paintEvent(QPaintEvent *event) override;
   bool eventFilter(QObject *obj, QEvent *event) override;
+  void keyPressEvent(QKeyEvent *event) override;
 
 private slots:
   void onUsernameChanged(const QString &text);
@@ -33,6 +36,13 @@ private slots:
   void switchToLogin();
   void switchToRegister();
   void onGuestClicked();
+
+  // Loading slots
+  void onLoadingUpdate();
+  void onAuthFinished(QNetworkReply* reply);
+  void onPatchLog(const QString& msg, const QString& level);
+  void onPatchFinished(const QString& msg);
+  void onPatchError(const QString& err);
 
 private:
   enum Mode { LOGIN, REGISTER };
@@ -49,8 +59,9 @@ private:
   QPushButton *m_continueBtn;
   QPushButton *m_guestBtn;
 
-  // Image
+  // Image & Logo
   QPixmap m_bgImage;
+  QPixmap m_logoPixmap;
 
   // Network
   QTimer *m_debounceTimer;
@@ -60,6 +71,32 @@ private:
   bool m_isAvailable;
   bool m_isChecking;
   bool m_isGuest;
+
+  // Integrated Loading State
+  bool m_isLoading;
+  float m_loadingProgress;
+  float m_loadingTime;
+  int m_loadingStage; // 0: verifying, 1: patching
+  float m_textOpacity;
+  QString m_statusText;
+
+  QTimer* m_loadingTimer;
+  QElapsedTimer m_loadingElapsed;
+
+  // Async Tasks
+  QNetworkReply* m_authReply;
+  bool m_authCompleted;
+  bool m_authSuccess;
+
+  SteamPatchWorker* m_patchWorker;
+  bool m_patchCompleted;
+  bool m_patchSuccess;
+  QString m_loadingError;
+
+  void startLoadingFlow(const QString& user, const QString& pass);
+  void showLoadingView();
+  void hideLoadingView();
+  void startPatchingProcess();
 };
 
 #endif // ONBOARDINGDIALOG_H
