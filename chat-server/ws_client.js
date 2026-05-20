@@ -7,7 +7,8 @@ if (!username) {
     process.exit(1);
 }
 
-const ws = new WebSocket('ws://localhost:3000');
+// Use the live Render deployment for WebSockets
+const ws = new WebSocket('wss://chat-server-d9k2.onrender.com');
 
 ws.on('open', () => {
     // Authenticate immediately

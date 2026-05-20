@@ -53,3 +53,4 @@ webserver/fetch_progress.json
 /webserver/__pycache__
 /build_debug
 DISCORD_GUIDE.md
+/chat-server

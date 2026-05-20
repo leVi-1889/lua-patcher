@@ -243,8 +243,8 @@ void ChatPage::onChatHistoryReceived(const QString& friendName, const QJsonArray
 
     for (int i = 0; i < messages.size(); ++i) {
         QJsonObject obj = messages[i].toObject();
-        QString sender = obj["sender"].toString();
-        QString text = obj["message"].toString();
+        QString sender = obj["sender_username"].toString();
+        QString text = obj["message_text"].toString();
         QString timeStr = obj["created_at"].toString();
         
         // Parse timestamp for display
