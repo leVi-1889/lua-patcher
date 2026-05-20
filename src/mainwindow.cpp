@@ -2821,6 +2821,13 @@ void MainWindow::setInitialUser(const QString& username, const QJsonObject& data
             m_notifTimer->start(30000); // 30 seconds
             fetchNotificationCount(); // Fetch immediately
         }
+        
+        // Start Background Chat Poller for unread messages (every 5 seconds)
+        if (!m_chatPollerTimer) {
+            m_chatPollerTimer = new QTimer(this);
+            connect(m_chatPollerTimer, &QTimer::timeout, this, &MainWindow::pollChatHistories);
+            m_chatPollerTimer->start(5000); // 5 seconds
+        }
     }
     updateSidebarAvatar();
 }
@@ -2832,6 +2839,39 @@ void MainWindow::sendHeartbeat() {
     QUrl url(Config::WEBSERVER_BASE_URL + "/api/user/heartbeat?username=" + m_username);
     QNetworkRequest request(url);
     m_networkManager->post(request, QByteArray());
+}
+void MainWindow::pollChatHistories() {
+    if (m_isGuest || m_username.isEmpty()) return;
+    
+    for (const QString& friendName : m_friendUsernames) {
+        QUrl url(Config::WEBSERVER_BASE_URL + "/api/social/chat/history");
+        QUrlQuery query;
+        query.addQueryItem("user1", m_username);
+        query.addQueryItem("user2", friendName);
+        url.setQuery(query);
+        
+        QNetworkRequest req(url);
+        QNetworkReply* reply = m_networkManager->get(req);
+        
+        connect(reply, &QNetworkReply::finished, this, [this, reply, friendName]() {
+            reply->deleteLater();
+            if (reply->error() != QNetworkReply::NoError) return;
+            
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            if (!doc.isArray()) return;
+            
+            int msgCount = doc.array().size();
+            
+            QSettings settings("leVi Studios", "LuaPatcher");
+            int savedMsgCount = settings.value("Social/MsgCount_" + friendName, 0).toInt();
+            
+            if (msgCount > savedMsgCount) {
+                settings.setValue("Social/MsgCount_" + friendName, msgCount);
+                // Trigger a UI refresh because unread count increased!
+                QTimer::singleShot(0, this, &MainWindow::refreshFriendsList);
+            }
+        });
+    }
 }
 
 void MainWindow::refreshFriendsList() {
@@ -2869,9 +2909,11 @@ void MainWindow::refreshFriendsList() {
         
         QList<QJsonObject> friendsList;
         int onlineCount = 0;
+        m_friendUsernames.clear();
         for (const QJsonValue& v : friendsArray) {
             QJsonObject f = v.toObject();
             friendsList.append(f);
+            m_friendUsernames.append(f["username"].toString());
             if (f["online"].toBool()) onlineCount++;
         }
         
@@ -2982,10 +3024,11 @@ void MainWindow::refreshFriendsList() {
                 p.drawEllipse(QPointF(34.0f, 34.0f), 4.5f, 4.5f);
             }
             
-            // Simulated unread count badge in top-left
+            // Real unread count badge from background poller
             QSettings settings("leVi Studios", "LuaPatcher");
-            bool isCleared = settings.value("Social/cleared_" + fName, false).toBool();
-            int unreadCount = isCleared ? 0 : ((qHash(fName) % 3 == 0) ? 0 : (qHash(fName) % 15) + 1);
+            int savedMsgCount = settings.value("Social/MsgCount_" + fName, 0).toInt();
+            int readMsgCount = settings.value("Social/ReadCount_" + fName, 0).toInt();
+            int unreadCount = qMax(0, savedMsgCount - readMsgCount);
             if (unreadCount > 0) {
                 p.setBrush(QColor("#0F121A")); // dark border background
                 p.setPen(Qt::NoPen);
@@ -3028,6 +3071,11 @@ void MainWindow::openChat(const QString& friendUsername, const QString& avatarUr
     
     QSettings settings("leVi Studios", "LuaPatcher");
     settings.setValue("Social/cleared_" + friendUsername, true);
+    
+    // Mark messages as read by matching ReadCount to MsgCount
+    int currentMsgCount = settings.value("Social/MsgCount_" + friendUsername, 0).toInt();
+    settings.setValue("Social/ReadCount_" + friendUsername, currentMsgCount);
+    
     refreshFriendsList();
     
     // Only save the previous index if we are NOT already on the chat page

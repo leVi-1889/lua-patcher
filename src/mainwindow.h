@@ -246,7 +246,11 @@ private:
     // Data
     QList<GameInfo> m_supportedGames;
     QMap<QString, QString> m_selectedGame;
-    
+    // Background Chat Polling
+    QTimer* m_chatPollerTimer = nullptr;
+    QStringList m_friendUsernames;
+    void pollChatHistories();
+
     // Network
     QNetworkAccessManager* m_networkManager;
     QNetworkReply* m_activeReply;
