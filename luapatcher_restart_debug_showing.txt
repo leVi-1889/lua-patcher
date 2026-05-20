@@ -1,0 +1,73 @@
+2026-05-19 21:13:49.997 | ========== RESTART BEGIN ==========
+2026-05-19 21:13:49.998 | Steam Dir: C:/Program Files (x86)/Steam
+2026-05-19 21:13:49.998 | Steam Exe: C:/Program Files (x86)/Steam/Steam.exe
+2026-05-19 21:13:49.998 | Steam Exe Exists: YES
+2026-05-19 21:13:49.998 | --- DLL STATE (BEFORE KILL) ---
+2026-05-19 21:13:49.998 |   Path: C:/Program Files (x86)/Steam/xinput1_4.dll
+2026-05-19 21:13:49.998 |   Exists: YES
+2026-05-19 21:13:49.998 |   Size: 673784 bytes
+2026-05-19 21:13:49.998 |   Modified: 2026-05-19 20:42:25
+2026-05-19 21:13:49.999 | --- STPLUG-IN STATE ---
+2026-05-19 21:13:49.999 |   Path: C:/Program Files (x86)/Steam/config/stplug-in
+2026-05-19 21:13:49.999 |   Exists: YES
+2026-05-19 21:13:49.999 |   Lua file count: 4
+2026-05-19 21:13:49.999 |     2358720.lua (280 bytes, modified 2026-05-17 14:11:33)
+2026-05-19 21:13:49.999 |     2483190.lua (531 bytes, modified 2026-05-17 00:45:35)
+2026-05-19 21:13:49.999 |     431960.lua (276 bytes, modified 2025-11-25 12:15:00)
+2026-05-19 21:13:49.999 |     532210.lua (3007 bytes, modified 2026-05-19 20:41:05)
+2026-05-19 21:13:49.999 | --- APPCACHE STATE (BEFORE KILL) ---
+2026-05-19 21:13:49.999 |   appinfo.vdf: EXISTS (367670 bytes, 2026-05-19 21:10:36)
+2026-05-19 21:13:49.999 |   packageinfo.vdf: EXISTS (11738 bytes, 2026-05-19 21:11:49)
+2026-05-19 21:13:49.999 | --- REGISTRY STATE (BEFORE KILL) ---
+2026-05-19 21:13:49.999 |   pid: 13180
+2026-05-19 21:13:49.999 |   ActiveUser: 762880287
+2026-05-19 21:13:49.999 |   SteamClientDll: C:\Program Files (x86)\Steam\steamclient.dll
+2026-05-19 21:13:49.999 |   SteamClientDll64: C:\Program Files (x86)\Steam\steamclient64.dll
+2026-05-19 21:13:49.999 | --- PROCESSES (BEFORE KILL) ---
+2026-05-19 21:13:51.005 |   [RUNNING] steam.exe                    13180 Console                    4   1,34,808 K Running         SAYED\sayed                                             0:00:20 Untitled
+  [RUNNING] steamwebhelper.exe           28736 Console                    4   1,88,432 K Running         SAYED\sayed                                             0:00:04 Steam                                                                   
+steamwebhelper.exe            5348 Console                    4     17,180 K Running         SAYED\sayed                                             0:00:00 N/A                                                                     
+steamwebhelper.exe           16228 Console                    4   1,50,992 K Running         SAYED\sayed                                             0:00:04 N/A                                                                     
+steamwebhelper.exe            6712 Console                    4     35,668 K Unknown         SAYED\sayed                                             0:00:00 N/A                                                                     
+steamwebhelper.exe            2524 Console                    4     23,944 K Unknown         SAYED\sayed                                             0:00:00 N/A                                                                     
+steamwebhelper.exe           22048 Console                    4   4,84,348 K Unknown         SAYED\sayed                                             0:00:09 N/A                                                                     
+steamwebhelper.exe            9768 Console                    4     51,348 K Unknown         SAYED\sayed                                             0:00:00 N/A
+  [RUNNING] steamservice.exe             22792 Services                   0     18,300 K Unknown         N/A                                                     0:00:00 N/A
+  [NOT RUNNING] GameOverlayUI.exe
+
+2026-05-19 21:13:51.005 | --- KILLING STEAM ---
+2026-05-19 21:13:51.181 |   taskkill exit code: 0
+2026-05-19 21:13:51.181 |   taskkill stdout: SUCCESS: The process "steam.exe" with PID 13180 has been terminated.
+2026-05-19 21:13:51.181 |   taskkill stderr: 
+2026-05-19 21:13:51.181 |   Waiting 2 seconds...
+2026-05-19 21:13:53.197 | --- PROCESSES (AFTER KILL, 2s wait) ---
+2026-05-19 21:13:53.891 |   [NOT RUNNING] steam.exe
+  [NOT RUNNING] steamwebhelper.exe
+  [NOT RUNNING] steamservice.exe
+  [NOT RUNNING] GameOverlayUI.exe
+
+2026-05-19 21:13:54.603 |   Survivors present: NO
+2026-05-19 21:13:54.603 | --- REGISTRY STATE (AFTER KILL) ---
+2026-05-19 21:13:54.606 |   pid: 13180
+2026-05-19 21:13:54.606 |   ActiveUser: 762880287
+2026-05-19 21:13:54.606 | --- LAUNCHING STEAM ---
+2026-05-19 21:13:54.606 |   Method: QProcess::startDetached
+2026-05-19 21:13:54.606 |   Exe: C:/Program Files (x86)/Steam/Steam.exe
+2026-05-19 21:13:54.606 |   Args: (none)
+2026-05-19 21:13:54.613 |   Launch: OK
+2026-05-19 21:13:59.623 | --- PROCESSES (5s AFTER LAUNCH) ---
+2026-05-19 21:14:00.530 |   [RUNNING] steam.exe                    13012 Console                    4     71,536 K Running         SAYED\sayed                                             0:00:00 N/A
+  [RUNNING] steamwebhelper.exe           22780 Console                    4     84,948 K Running         SAYED\sayed                                             0:00:00 N/A                                                                     
+steamwebhelper.exe            9228 Console                    4     17,364 K Running         SAYED\sayed                                             0:00:00 N/A                                                                     
+steamwebhelper.exe           16760 Console                    4     65,948 K Unknown         SAYED\sayed                                             0:00:00 N/A                                                                     
+steamwebhelper.exe            8340 Console                    4     29,880 K Unknown         SAYED\sayed                                             0:00:00 N/A                                                                     
+steamwebhelper.exe           28336 Console                    4     22,832 K Unknown         SAYED\sayed                                             0:00:00 N/A
+  [RUNNING] steamservice.exe             11688 Services                   0     16,804 K Unknown         N/A                                                     0:00:00 N/A
+  [NOT RUNNING] GameOverlayUI.exe
+
+2026-05-19 21:14:00.530 | --- DLL STATE (AFTER LAUNCH) ---
+2026-05-19 21:14:00.530 |   Exists: YES
+2026-05-19 21:14:00.530 |   Size: 673784 bytes
+2026-05-19 21:14:00.530 |   Modified: 2026-05-19 20:42:25
+2026-05-19 21:14:00.530 | ========== RESTART END ==========
+

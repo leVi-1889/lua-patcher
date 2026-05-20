@@ -27,8 +27,8 @@ signals:
 
 private slots:
     void sendMessage();
-    void fetchHistory();
-    void onHistoryFetched();
+    void onChatMessageReceived(const QString& sender, const QString& receiver, const QString& message);
+    void onChatHistoryReceived(const QString& friendName, const QJsonArray& messages);
 
 private:
     void setupUI();
@@ -39,7 +39,6 @@ private:
     QString m_friendUsername;
     QString m_friendAvatarBase64;
     QNetworkAccessManager* m_netMgr;
-    QTimer* m_pollTimer;
 
     QVBoxLayout* m_chatLayout;
     QScrollArea* m_scrollArea;

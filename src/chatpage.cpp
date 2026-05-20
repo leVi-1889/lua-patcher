@@ -8,6 +8,9 @@
 #include <QPainterPath>
 #include <QByteArray>
 #include <QPixmap>
+#include <QSettings>
+
+#include "mainwindow.h"
 
 ChatPage::ChatPage(const QString& myUsername, const QString& friendUsername, const QString& friendAvatarBase64, QNetworkAccessManager* netMgr, QWidget* parent)
     : QWidget(parent)
@@ -18,15 +21,14 @@ ChatPage::ChatPage(const QString& myUsername, const QString& friendUsername, con
 {
     setupUI();
 
-    m_pollTimer = new QTimer(this);
-    connect(m_pollTimer, &QTimer::timeout, this, &ChatPage::fetchHistory);
-    m_pollTimer->start(2000); // Poll every 2 seconds
-
-    fetchHistory();
+    MainWindow* mainWindow = qobject_cast<MainWindow*>(parent);
+    if (mainWindow) {
+        connect(mainWindow, &MainWindow::chatMessageReceived, this, &ChatPage::onChatMessageReceived);
+        connect(mainWindow, &MainWindow::chatHistoryReceived, this, &ChatPage::onChatHistoryReceived);
+    }
 }
 
 ChatPage::~ChatPage() {
-    m_pollTimer->stop();
 }
 
 void ChatPage::setupUI() {
@@ -202,44 +204,32 @@ void ChatPage::sendMessage() {
 
     m_messageInput->clear();
 
-    QJsonObject obj;
-    obj["sender"] = m_myUsername;
-    obj["receiver"] = m_friendUsername;
-    obj["message"] = msg;
-
-    QUrl url(Config::WEBSERVER_BASE_URL + "/api/social/chat/send");
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-
-    m_netMgr->post(request, QJsonDocument(obj).toJson());
+    MainWindow* mainWindow = qobject_cast<MainWindow*>(parent());
+    if (mainWindow) {
+        mainWindow->sendChatMessage(m_friendUsername, msg);
+    }
     
     // Optimistically add bubble
     addMessageBubble(msg, true, QDateTime::currentDateTime().toString("h:mm AP"));
 }
 
-void ChatPage::fetchHistory() {
-    QUrl url(Config::WEBSERVER_BASE_URL + "/api/social/chat/history");
-    url.setQuery("user1=" + m_myUsername + "&user2=" + m_friendUsername);
-    
-    QNetworkReply* reply = m_netMgr->get(QNetworkRequest(url));
-    connect(reply, &QNetworkReply::finished, this, &ChatPage::onHistoryFetched);
+void ChatPage::onChatMessageReceived(const QString& sender, const QString& receiver, const QString& message) {
+    if (sender == m_friendUsername) {
+        addMessageBubble(message, false, QDateTime::currentDateTime().toString("h:mm AP"));
+        
+        // Since we are looking at the chat, mark message as read
+        QSettings settings("leVi Studios", "LuaPatcher");
+        int count = settings.value("Social/MsgCount_" + m_friendUsername, 0).toInt();
+        settings.setValue("Social/ReadCount_" + m_friendUsername, count);
+    }
 }
 
-void ChatPage::onHistoryFetched() {
-    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    if (!reply) return;
-    reply->deleteLater();
-
-    if (reply->error() != QNetworkReply::NoError) return;
-
-    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-    if (!doc.isArray()) return;
-
-    QJsonArray arr = doc.array();
+void ChatPage::onChatHistoryReceived(const QString& friendName, const QJsonArray& messages) {
+    if (friendName != m_friendUsername) return;
     
     // Optimization: Only redraw if count changed or for first load
-    if (arr.size() == m_lastMessageCount) return;
-    m_lastMessageCount = arr.size();
+    if (messages.size() == m_lastMessageCount) return;
+    m_lastMessageCount = messages.size();
 
     // Clear old messages (except stretch)
     while (m_chatLayout->count() > 1) {
@@ -251,13 +241,13 @@ void ChatPage::onHistoryFetched() {
         delete item;
     }
 
-    for (int i = 0; i < arr.size(); ++i) {
-        QJsonObject obj = arr[i].toObject();
-        QString sender = obj["sender_username"].toString();
-        QString text = obj["message_text"].toString();
+    for (int i = 0; i < messages.size(); ++i) {
+        QJsonObject obj = messages[i].toObject();
+        QString sender = obj["sender"].toString();
+        QString text = obj["message"].toString();
         QString timeStr = obj["created_at"].toString();
         
-        // Parse timestamp for display (e.g. 2024-04-26T14:22:56...)
+        // Parse timestamp for display
         QDateTime dt = QDateTime::fromString(timeStr, Qt::ISODate);
         QString displayTime = dt.isNull() ? "" : dt.toLocalTime().toString("h:mm AP");
 

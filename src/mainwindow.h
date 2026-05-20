@@ -75,6 +75,11 @@ public:
     ~MainWindow();
 
     void setInitialUser(const QString& username, const QJsonObject& data, bool guest);
+    void sendChatMessage(const QString& receiver, const QString& message);
+
+signals:
+    void chatMessageReceived(const QString& sender, const QString& receiver, const QString& message);
+    void chatHistoryReceived(const QString& friendName, const QJsonArray& messages);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -89,6 +94,11 @@ private slots:
     void onSyncError(QString error);
     void refreshFriendsList();
     void updateSidebarAvatar();
+    
+    // WebSocket Bridge
+    void onWsProcessStarted();
+    void onWsProcessFinished(int exitCode);
+    void onWsProcessReadyRead();
     void sendHeartbeat();
     void onNotificationClicked();
     void fetchNotificationCount();
@@ -246,10 +256,10 @@ private:
     // Data
     QList<GameInfo> m_supportedGames;
     QMap<QString, QString> m_selectedGame;
-    // Background Chat Polling
-    QTimer* m_chatPollerTimer = nullptr;
+    // Real-time Chat (WebSockets via Node bridge)
+    class QProcess* m_wsProcess = nullptr;
     QStringList m_friendUsernames;
-    void pollChatHistories();
+    void connectToChatServer();
 
     // Network
     QNetworkAccessManager* m_networkManager;
