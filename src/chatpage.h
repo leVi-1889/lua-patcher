@@ -45,7 +45,6 @@ private:
     QScrollArea* m_scrollArea;
     QLineEdit* m_messageInput;
     QLabel* m_friendNameLabel;
-    QLabel* m_statusLabel;
     
     int m_lastMessageCount = 0;
 };

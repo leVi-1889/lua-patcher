@@ -90,14 +90,11 @@ void ChatPage::setupUI() {
     headerLayout->addWidget(avatar);
 
     QVBoxLayout* nameCol = new QVBoxLayout();
-    nameCol->setSpacing(2);
+    nameCol->setAlignment(Qt::AlignVCenter);
     m_friendNameLabel = new QLabel(m_friendUsername);
     m_friendNameLabel->setStyleSheet("color: white; font-size: 16px; font-weight: bold; border: none; background: transparent;");
     nameCol->addWidget(m_friendNameLabel);
 
-    m_statusLabel = new QLabel("● ACTIVE NOW");
-    m_statusLabel->setStyleSheet("color: #2ECC71; font-size: 10px; font-weight: 800; border: none; background: transparent;");
-    nameCol->addWidget(m_statusLabel);
     headerLayout->addLayout(nameCol);
     headerLayout->addStretch();
 
