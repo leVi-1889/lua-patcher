@@ -2685,6 +2685,8 @@ void MainWindow::onThumbnailDownloaded(QNetworkReply* reply) {
     // Fallback logic for older games that don't have the new vertical Steam library asset
     if (!success) {
         QString originalUrl = reply->url().toString();
+        
+        // 1st fallback: try header.jpg
         if (originalUrl.contains("library_600x900")) {
             m_activeThumbnailDownloads.insert(appId);
             m_activeThumbnailCount++;
@@ -2697,8 +2699,20 @@ void MainWindow::onThumbnailDownloaded(QNetworkReply* reply) {
             return;
         }
         
-        // If even fallback fails, aggressively cache failure as a null pixmap
-        // to prevent spamming the steam servers on every frame scroll
+        // 2nd fallback: try capsule_616x353.jpg (available for almost every game)
+        if (originalUrl.contains("header.jpg")) {
+            m_activeThumbnailDownloads.insert(appId);
+            m_activeThumbnailCount++;
+            QString fallbackUrl = QString("https://cdn.akamai.steamstatic.com/steam/apps/%1/capsule_616x353.jpg").arg(appId);
+            QNetworkRequest req{QUrl(fallbackUrl)};
+            req.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::PreferCache);
+            QNetworkReply* tr = m_networkManager->get(req);
+            tr->setProperty("appid", appId);
+            connect(tr, &QNetworkReply::finished, this, [this, tr]() { onThumbnailDownloaded(tr); });
+            return;
+        }
+        
+        // All 3 URLs failed — cache failure to stop retrying
         m_thumbnailCache[appId] = QPixmap();
         // Drain the next request from the pending queue
         loadVisibleThumbnails();
