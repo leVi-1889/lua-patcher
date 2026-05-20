@@ -2981,6 +2981,21 @@ void MainWindow::refreshFriendsList() {
                 p.setBrush(QColor("#2ECC71"));
                 p.drawEllipse(QPointF(34.0f, 34.0f), 4.5f, 4.5f);
             }
+            
+            // Simulated unread count badge in top-left
+            int unreadCount = (qHash(fName) % 3 == 0) ? 0 : (qHash(fName) % 15) + 1;
+            if (unreadCount > 0) {
+                p.setBrush(QColor("#0F121A")); // dark border background
+                p.setPen(Qt::NoPen);
+                p.drawEllipse(QPointF(10.0f, 10.0f), 10.0f, 10.0f);
+                
+                p.setBrush(QColor("#E74C3C")); // WhatsApp/iOS red
+                p.drawEllipse(QPointF(10.0f, 10.0f), 8.0f, 8.0f);
+                
+                p.setPen(Qt::white);
+                p.setFont(QFont("Segoe UI", 7, QFont::Bold));
+                p.drawText(QRectF(0, 0, 20, 20), Qt::AlignCenter, QString::number(unreadCount));
+            }
             p.end();
             av->setPixmap(pix);
             lay->addWidget(av);
