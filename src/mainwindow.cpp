@@ -2983,7 +2983,9 @@ void MainWindow::refreshFriendsList() {
             }
             
             // Simulated unread count badge in top-left
-            int unreadCount = (qHash(fName) % 3 == 0) ? 0 : (qHash(fName) % 15) + 1;
+            QSettings settings("leVi Studios", "LuaPatcher");
+            bool isCleared = settings.value("Social/cleared_" + fName, false).toBool();
+            int unreadCount = isCleared ? 0 : ((qHash(fName) % 3 == 0) ? 0 : (qHash(fName) % 15) + 1);
             if (unreadCount > 0) {
                 p.setBrush(QColor("#0F121A")); // dark border background
                 p.setPen(Qt::NoPen);
@@ -3023,6 +3025,10 @@ void MainWindow::openChat(const QString& friendUsername) {
 
 void MainWindow::openChat(const QString& friendUsername, const QString& avatarUrl) {
     if (!m_chatPage) return;
+    
+    QSettings settings("leVi Studios", "LuaPatcher");
+    settings.setValue("Social/cleared_" + friendUsername, true);
+    refreshFriendsList();
     
     // Only save the previous index if we are NOT already on the chat page
     // This prevents getting trapped if we click multiple friends in a row
