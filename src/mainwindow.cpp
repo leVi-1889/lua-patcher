@@ -2867,8 +2867,16 @@ void MainWindow::connectToChatServer() {
     QStringList args;
     args << "ws_client.js" << m_username;
     
-    // Hardcoded to project dir for testing
-    m_wsProcess->setWorkingDirectory("d:/github luapatcher/chat-server");
+    // Dynamically find chat-server directory relative to the executable
+    QString exeDir = QCoreApplication::applicationDirPath();
+    QString targetDir = exeDir + "/chat-server";
+    
+    // Fallback for when running directly from the build/Release folder during dev
+    if (!QDir(targetDir).exists()) {
+        targetDir = exeDir + "/../../chat-server";
+    }
+    
+    m_wsProcess->setWorkingDirectory(targetDir);
     
     if (m_wsProcess->state() == QProcess::NotRunning) {
         m_wsProcess->start(nodeCmd, args);
