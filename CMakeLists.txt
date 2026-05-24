@@ -18,8 +18,8 @@ else()
 endif()
 add_definitions(-DSERVER_ACCESS_TOKEN="${ACCESS_TOKEN}")
 
-# Find Qt6 - Core components + optional Svg
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
+# Find Qt6 - Core components + optional Svg + WebSockets
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network WebSockets)
 find_package(Qt6 QUIET COMPONENTS Svg)
 
 # Application icon resource (optional)
@@ -109,6 +109,7 @@ target_link_libraries(LuaPatcher PRIVATE
     Qt6::Gui
     Qt6::Widgets
     Qt6::Network
+    Qt6::WebSockets
     dwmapi
 )
 

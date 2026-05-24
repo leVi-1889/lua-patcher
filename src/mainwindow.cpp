@@ -23,7 +23,7 @@
 #include "utils/paths.h"
 #include "config.h"
 #include <QBuffer>
-#include <QProcess>
+#include <QWebSocket>
 #include <QApplication>
 #include <QImageWriter>
 
@@ -2853,37 +2853,26 @@ void MainWindow::sendHeartbeat() {
     m_networkManager->post(request, QByteArray());
 }
 void MainWindow::connectToChatServer() {
-    if (!m_wsProcess) {
-        m_wsProcess = new QProcess(this);
-        connect(m_wsProcess, &QProcess::started, this, &MainWindow::onWsProcessStarted);
-        connect(m_wsProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this](int exitCode) {
-            onWsProcessFinished(exitCode);
-        });
-        connect(m_wsProcess, &QProcess::readyReadStandardOutput, this, &MainWindow::onWsProcessReadyRead);
+    if (!m_webSocket) {
+        m_webSocket = new QWebSocket();
+        connect(m_webSocket, &QWebSocket::connected, this, &MainWindow::onWebSocketConnected);
+        connect(m_webSocket, &QWebSocket::disconnected, this, &MainWindow::onWebSocketDisconnected);
+        connect(m_webSocket, &QWebSocket::textMessageReceived, this, &MainWindow::onWebSocketTextMessageReceived);
     }
     
-    // Start node with the ws_client bridge
-    QString nodeCmd = "node";
-    QStringList args;
-    args << "ws_client.js" << m_username;
-    
-    // Dynamically find chat-server directory relative to the executable
-    QString exeDir = QCoreApplication::applicationDirPath();
-    QString targetDir = exeDir + "/chat-server";
-    
-    // Fallback for when running directly from the build/Release folder during dev
-    if (!QDir(targetDir).exists()) {
-        targetDir = exeDir + "/../../chat-server";
-    }
-    
-    m_wsProcess->setWorkingDirectory(targetDir);
-    
-    if (m_wsProcess->state() == QProcess::NotRunning) {
-        m_wsProcess->start(nodeCmd, args);
+    if (m_webSocket->state() == QAbstractSocket::UnconnectedState) {
+        m_webSocket->open(QUrl("wss://chat-server-d9k2.onrender.com"));
     }
 }
 
-void MainWindow::onWsProcessStarted() {
+void MainWindow::onWebSocketConnected() {
+    // Authenticate immediately
+    QJsonObject authMsg;
+    authMsg["type"] = "authenticate";
+    authMsg["username"] = m_username;
+    QJsonDocument authDoc(authMsg);
+    m_webSocket->sendTextMessage(QString::fromUtf8(authDoc.toJson(QJsonDocument::Compact)));
+
     // Fetch history for all friends to sync unread counts on reconnect
     for (const QString& friendName : m_friendUsernames) {
         QJsonObject fetchMsg;
@@ -2891,61 +2880,57 @@ void MainWindow::onWsProcessStarted() {
         fetchMsg["user1"] = m_username;
         fetchMsg["user2"] = friendName;
         QJsonDocument fdoc(fetchMsg);
-        QString msgStr = QString::fromUtf8(fdoc.toJson(QJsonDocument::Compact)) + "\n";
-        m_wsProcess->write(msgStr.toUtf8());
+        m_webSocket->sendTextMessage(QString::fromUtf8(fdoc.toJson(QJsonDocument::Compact)));
     }
 }
 
-void MainWindow::onWsProcessFinished(int exitCode) {
+void MainWindow::onWebSocketDisconnected() {
     // Try to reconnect in 5 seconds
     QTimer::singleShot(5000, this, &MainWindow::connectToChatServer);
 }
 
-void MainWindow::onWsProcessReadyRead() {
-    while (m_wsProcess->canReadLine()) {
-        QByteArray line = m_wsProcess->readLine();
-        QJsonDocument doc = QJsonDocument::fromJson(line);
-        if (!doc.isObject()) continue;
+void MainWindow::onWebSocketTextMessageReceived(const QString& message) {
+    QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8());
+    if (!doc.isObject()) return;
+    
+    QJsonObject obj = doc.object();
+    QString type = obj["type"].toString();
+    
+    if (type == "new_message") {
+        QString sender = obj["sender"].toString();
+        QString receiver = obj["receiver"].toString();
+        QString msg = obj["message"].toString();
         
-        QJsonObject obj = doc.object();
-        QString type = obj["type"].toString();
+        // Broadcast signal so open ChatPages can display it instantly
+        emit chatMessageReceived(sender, receiver, msg);
         
-        if (type == "new_message") {
-            QString sender = obj["sender"].toString();
-            QString receiver = obj["receiver"].toString();
-            QString msg = obj["message"].toString();
-            
-            // Broadcast signal so open ChatPages can display it instantly
-            emit chatMessageReceived(sender, receiver, msg);
-            
-            // Update Unread count in settings so the friends list red bubble updates immediately
-            QSettings settings("leVi Studios", "LuaPatcher");
-            int savedMsgCount = settings.value("Social/MsgCount_" + sender, 0).toInt();
-            settings.setValue("Social/MsgCount_" + sender, savedMsgCount + 1);
-            
+        // Update Unread count in settings so the friends list red bubble updates immediately
+        QSettings settings("leVi Studios", "LuaPatcher");
+        int savedMsgCount = settings.value("Social/MsgCount_" + sender, 0).toInt();
+        settings.setValue("Social/MsgCount_" + sender, savedMsgCount + 1);
+        
+        refreshFriendsList();
+    }
+    else if (type == "chat_history") {
+        QString friendName = obj["user2"].toString();
+        QJsonArray messages = obj["messages"].toArray();
+        int msgCount = messages.size();
+        
+        // Emit signal so ChatPage can display history
+        emit chatHistoryReceived(friendName, messages);
+        
+        QSettings settings("leVi Studios", "LuaPatcher");
+        int savedMsgCount = settings.value("Social/MsgCount_" + friendName, 0).toInt();
+        
+        if (msgCount > savedMsgCount) {
+            settings.setValue("Social/MsgCount_" + friendName, msgCount);
             refreshFriendsList();
-        }
-        else if (type == "chat_history") {
-            QString friendName = obj["user2"].toString();
-            QJsonArray messages = obj["messages"].toArray();
-            int msgCount = messages.size();
-            
-            // Emit signal so ChatPage can display history
-            emit chatHistoryReceived(friendName, messages);
-            
-            QSettings settings("leVi Studios", "LuaPatcher");
-            int savedMsgCount = settings.value("Social/MsgCount_" + friendName, 0).toInt();
-            
-            if (msgCount > savedMsgCount) {
-                settings.setValue("Social/MsgCount_" + friendName, msgCount);
-                refreshFriendsList();
-            }
         }
     }
 }
 
 void MainWindow::sendChatMessage(const QString& receiver, const QString& message) {
-    if (!m_wsProcess || m_wsProcess->state() != QProcess::Running) return;
+    if (!m_webSocket || m_webSocket->state() != QAbstractSocket::ConnectedState) return;
     
     QJsonObject msg;
     msg["type"] = "send_message";
@@ -2953,8 +2938,7 @@ void MainWindow::sendChatMessage(const QString& receiver, const QString& message
     msg["receiver"] = receiver;
     msg["message"] = message;
     QJsonDocument doc(msg);
-    QString msgStr = QString::fromUtf8(doc.toJson(QJsonDocument::Compact)) + "\n";
-    m_wsProcess->write(msgStr.toUtf8());
+    m_webSocket->sendTextMessage(QString::fromUtf8(doc.toJson(QJsonDocument::Compact)));
 }
 
 void MainWindow::refreshFriendsList() {

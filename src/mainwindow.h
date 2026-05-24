@@ -95,10 +95,10 @@ private slots:
     void refreshFriendsList();
     void updateSidebarAvatar();
     
-    // WebSocket Bridge
-    void onWsProcessStarted();
-    void onWsProcessFinished(int exitCode);
-    void onWsProcessReadyRead();
+    // WebSocket
+    void onWebSocketConnected();
+    void onWebSocketDisconnected();
+    void onWebSocketTextMessageReceived(const QString& message);
     void sendHeartbeat();
     void onNotificationClicked();
     void fetchNotificationCount();
@@ -256,8 +256,8 @@ private:
     // Data
     QList<GameInfo> m_supportedGames;
     QMap<QString, QString> m_selectedGame;
-    // Real-time Chat (WebSockets via Node bridge)
-    class QProcess* m_wsProcess = nullptr;
+    // Real-time Chat (WebSockets)
+    class QWebSocket* m_webSocket = nullptr;
     QStringList m_friendUsernames;
     void connectToChatServer();
 
