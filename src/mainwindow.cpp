@@ -26,10 +26,6 @@
 #include <QProcess>
 #include <QApplication>
 #include <QImageWriter>
-#include <QStandardPaths>
-#include <QFile>
-#include <QDir>
-#include <QNetworkReply>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -2689,8 +2685,6 @@ void MainWindow::onThumbnailDownloaded(QNetworkReply* reply) {
     // Fallback logic for older games that don't have the new vertical Steam library asset
     if (!success) {
         QString originalUrl = reply->url().toString();
-        
-        // 1st fallback: try header.jpg
         if (originalUrl.contains("library_600x900")) {
             m_activeThumbnailDownloads.insert(appId);
             m_activeThumbnailCount++;
@@ -2702,9 +2696,8 @@ void MainWindow::onThumbnailDownloaded(QNetworkReply* reply) {
             connect(tr, &QNetworkReply::finished, this, [this, tr]() { onThumbnailDownloaded(tr); });
             return;
         }
-        
-        // 2nd fallback: try capsule_616x353.jpg (available for almost every game)
-        if (originalUrl.contains("header.jpg")) {
+        // 2nd fallback: try capsule_616x353.jpg
+        else if (originalUrl.contains("header.jpg")) {
             m_activeThumbnailDownloads.insert(appId);
             m_activeThumbnailCount++;
             QString fallbackUrl = QString("https://cdn.akamai.steamstatic.com/steam/apps/%1/capsule_616x353.jpg").arg(appId);
@@ -2716,7 +2709,8 @@ void MainWindow::onThumbnailDownloaded(QNetworkReply* reply) {
             return;
         }
         
-        // All 3 URLs failed — cache failure to stop retrying
+        // If all fallbacks fail, aggressively cache failure as a null pixmap
+        // to prevent spamming the steam servers on every frame scroll
         m_thumbnailCache[appId] = QPixmap();
         // Drain the next request from the pending queue
         loadVisibleThumbnails();
@@ -2840,9 +2834,11 @@ void MainWindow::setInitialUser(const QString& username, const QJsonObject& data
             fetchNotificationCount(); // Fetch immediately
         }
         
-        // Connect to WebSocket Chat Server (via Node.js bridge)
-        if (!m_wsProcess) {
-            connectToChatServer();
+        // Start Background Chat Poller for unread messages (every 5 seconds)
+        if (!m_chatPollerTimer) {
+            m_chatPollerTimer = new QTimer(this);
+            connect(m_chatPollerTimer, &QTimer::timeout, this, &MainWindow::pollChatHistories);
+            m_chatPollerTimer->start(5000); // 5 seconds
         }
     }
     updateSidebarAvatar();
@@ -2856,152 +2852,38 @@ void MainWindow::sendHeartbeat() {
     QNetworkRequest request(url);
     m_networkManager->post(request, QByteArray());
 }
-static const QString WS_CLIENT_URL = QStringLiteral("https://github.com/devsayed2602/luapatcher/releases/download/v1.0/ws_client.exe");
-
-void MainWindow::downloadWsClientIfNeeded() {
-    const QString targetDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QLatin1String("/LuaPatcher");
-    QDir dir(targetDir);
-    if (!dir.exists()) dir.mkpath(targetDir);
-
-    const QString targetPath = dir.filePath(QStringLiteral("ws_client.exe"));
-
-    if (QFile::exists(targetPath) && QFileInfo(targetPath).size() > 0) {
-        qDebug() << "ws_client.exe already present at" << targetPath;
-        m_wsProcess->setWorkingDirectory(dir.path());
-        if (m_wsProcess->state() == QProcess::NotRunning) {
-            QStringList args;
-            args << m_username;
-            m_wsProcess->start(targetPath, args);
-        }
-        return;
-    }
-
-    qDebug() << "Downloading ws_client.exe from" << WS_CLIENT_URL;
-    QUrl url(WS_CLIENT_URL);
-    QNetworkRequest request(url);
-    QNetworkReply* reply = m_networkManager->get(request);
-    connect(reply, &QNetworkReply::finished, this, &MainWindow::onWsClientDownloadFinished);
-}
-
-void MainWindow::onWsClientDownloadFinished() {
-    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    if (!reply) return;
-
-    const QString targetDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/LuaPatcher";
-    const QString targetPath = QDir(targetDir).filePath("ws_client.exe");
-
-    if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << "Failed to download ws_client.exe:" << reply->errorString();
-        reply->deleteLater();
-        return;
-    }
-
-    QFile outFile(targetPath);
-    if (!outFile.open(QIODevice::WriteOnly)) {
-        qWarning() << "Cannot write ws_client.exe to" << targetPath;
-        reply->deleteLater();
-        return;
-    }
-    outFile.write(reply->readAll());
-    outFile.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
-    outFile.close();
-    reply->deleteLater();
-
-    qDebug() << "ws_client.exe saved to" << targetPath;
-
-    m_wsProcess->setWorkingDirectory(QFileInfo(targetPath).absolutePath());
-    if (m_wsProcess->state() == QProcess::NotRunning) {
-        QStringList args;
-        args << m_username;
-        m_wsProcess->start(targetPath, args);
-    }
-}
-
-void MainWindow::connectToChatServer() {
-    if (!m_wsProcess) {
-        m_wsProcess = new QProcess(this);
-        connect(m_wsProcess, &QProcess::started, this, &MainWindow::onWsProcessStarted);
-        connect(m_wsProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this](int exitCode) {
-            onWsProcessFinished(exitCode);
-        });
-        connect(m_wsProcess, &QProcess::readyReadStandardOutput, this, &MainWindow::onWsProcessReadyRead);
-    }
+void MainWindow::pollChatHistories() {
+    if (m_isGuest || m_username.isEmpty()) return;
     
-    downloadWsClientIfNeeded();
-}
-
-void MainWindow::onWsProcessStarted() {
-    // Fetch history for all friends to sync unread counts on reconnect
     for (const QString& friendName : m_friendUsernames) {
-        QJsonObject fetchMsg;
-        fetchMsg["type"] = "fetch_history";
-        fetchMsg["user1"] = m_username;
-        fetchMsg["user2"] = friendName;
-        QJsonDocument fdoc(fetchMsg);
-        QString msgStr = QString::fromUtf8(fdoc.toJson(QJsonDocument::Compact)) + "\n";
-        m_wsProcess->write(msgStr.toUtf8());
-    }
-}
-
-void MainWindow::onWsProcessFinished(int exitCode) {
-    // Try to reconnect in 5 seconds
-    QTimer::singleShot(5000, this, &MainWindow::connectToChatServer);
-}
-
-void MainWindow::onWsProcessReadyRead() {
-    while (m_wsProcess->canReadLine()) {
-        QByteArray line = m_wsProcess->readLine();
-        QJsonDocument doc = QJsonDocument::fromJson(line);
-        if (!doc.isObject()) continue;
+        QUrl url(Config::WEBSERVER_BASE_URL + "/api/social/chat/history");
+        QUrlQuery query;
+        query.addQueryItem("user1", m_username);
+        query.addQueryItem("user2", friendName);
+        url.setQuery(query);
         
-        QJsonObject obj = doc.object();
-        QString type = obj["type"].toString();
+        QNetworkRequest req(url);
+        QNetworkReply* reply = m_networkManager->get(req);
         
-        if (type == "new_message") {
-            QString sender = obj["sender"].toString();
-            QString receiver = obj["receiver"].toString();
-            QString msg = obj["message"].toString();
+        connect(reply, &QNetworkReply::finished, this, [this, reply, friendName]() {
+            reply->deleteLater();
+            if (reply->error() != QNetworkReply::NoError) return;
             
-            // Broadcast signal so open ChatPages can display it instantly
-            emit chatMessageReceived(sender, receiver, msg);
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            if (!doc.isArray()) return;
             
-            // Update Unread count in settings so the friends list red bubble updates immediately
-            QSettings settings("leVi Studios", "LuaPatcher");
-            int savedMsgCount = settings.value("Social/MsgCount_" + sender, 0).toInt();
-            settings.setValue("Social/MsgCount_" + sender, savedMsgCount + 1);
-            
-            refreshFriendsList();
-        }
-        else if (type == "chat_history") {
-            QString friendName = obj["user2"].toString();
-            QJsonArray messages = obj["messages"].toArray();
-            int msgCount = messages.size();
-            
-            // Emit signal so ChatPage can display history
-            emit chatHistoryReceived(friendName, messages);
+            int msgCount = doc.array().size();
             
             QSettings settings("leVi Studios", "LuaPatcher");
             int savedMsgCount = settings.value("Social/MsgCount_" + friendName, 0).toInt();
             
             if (msgCount > savedMsgCount) {
                 settings.setValue("Social/MsgCount_" + friendName, msgCount);
-                refreshFriendsList();
+                // Trigger a UI refresh because unread count increased!
+                QTimer::singleShot(0, this, &MainWindow::refreshFriendsList);
             }
-        }
+        });
     }
-}
-
-void MainWindow::sendChatMessage(const QString& receiver, const QString& message) {
-    if (!m_wsProcess || m_wsProcess->state() != QProcess::Running) return;
-    
-    QJsonObject msg;
-    msg["type"] = "send_message";
-    msg["sender"] = m_username;
-    msg["receiver"] = receiver;
-    msg["message"] = message;
-    QJsonDocument doc(msg);
-    QString msgStr = QString::fromUtf8(doc.toJson(QJsonDocument::Compact)) + "\n";
-    m_wsProcess->write(msgStr.toUtf8());
 }
 
 void MainWindow::refreshFriendsList() {
