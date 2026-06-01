@@ -95,10 +95,10 @@ private slots:
     void refreshFriendsList();
     void updateSidebarAvatar();
     
-    // WebSocket
-    void onWebSocketConnected();
-    void onWebSocketDisconnected();
-    void onWebSocketTextMessageReceived(const QString& message);
+    // WebSocket Bridge
+    void onWsProcessStarted();
+    void onWsProcessFinished(int exitCode);
+    void onWsProcessReadyRead();
     void sendHeartbeat();
     void onNotificationClicked();
     void fetchNotificationCount();
