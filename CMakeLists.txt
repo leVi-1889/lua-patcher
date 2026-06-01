@@ -109,7 +109,6 @@ target_link_libraries(LuaPatcher PRIVATE
     Qt6::Gui
     Qt6::Widgets
     Qt6::Network
-    Qt6::WebSockets
     dwmapi
 )
 

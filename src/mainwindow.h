@@ -99,6 +99,7 @@ private slots:
     void onWsProcessStarted();
     void onWsProcessFinished(int exitCode);
     void onWsProcessReadyRead();
+    void onWsClientDownloadFinished();
     void sendHeartbeat();
     void onNotificationClicked();
     void fetchNotificationCount();
@@ -256,10 +257,11 @@ private:
     // Data
     QList<GameInfo> m_supportedGames;
     QMap<QString, QString> m_selectedGame;
-    // Real-time Chat (WebSockets)
-    class QWebSocket* m_webSocket = nullptr;
+    // Real-time Chat (WebSockets via Node bridge)
+    class QProcess* m_wsProcess = nullptr;
     QStringList m_friendUsernames;
     void connectToChatServer();
+    void downloadWsClientIfNeeded();
 
     // Network
     QNetworkAccessManager* m_networkManager;
