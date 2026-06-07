@@ -1,54 +1,46 @@
 #include <windows.h>
 #include <string>
 
-std::wstring GetRegistryString(HKEY hKey, const std::wstring& subKey, const std::wstring& valueName) {
-    HKEY hTestKey;
-    if (RegOpenKeyExW(hKey, subKey.c_str(), 0, KEY_READ, &hTestKey) == ERROR_SUCCESS) {
-        DWORD type = REG_SZ;
-        DWORD cbData = 0;
-        if (RegQueryValueExW(hTestKey, valueName.c_str(), NULL, &type, NULL, &cbData) == ERROR_SUCCESS && type == REG_SZ) {
-            std::wstring value(cbData / sizeof(wchar_t), L'\0');
-            if (RegQueryValueExW(hTestKey, valueName.c_str(), NULL, NULL, reinterpret_cast<LPBYTE>(&value[0]), &cbData) == ERROR_SUCCESS) {
-                // Remove trailing null terminators
-                while (!value.empty() && value.back() == L'\0') {
-                    value.pop_back();
-                }
-                RegCloseKey(hTestKey);
-                return value;
-            }
-        }
-        RegCloseKey(hTestKey);
-    }
-    return L"";
-}
-
-void ClearRegistryString(HKEY hKey, const std::wstring& subKey, const std::wstring& valueName) {
-    HKEY hTestKey;
-    if (RegOpenKeyExW(hKey, subKey.c_str(), 0, KEY_SET_VALUE, &hTestKey) == ERROR_SUCCESS) {
-        RegDeleteValueW(hTestKey, valueName.c_str());
-        RegCloseKey(hTestKey);
-    }
-}
-
 DWORD WINAPI PulseThread(LPVOID lpParam) {
-    // Wait a few seconds for Steam UI to initialize
+    // Wait for Steam UI to fully initialize
     Sleep(5000);
 
-    std::wstring subKey = L"Software\\leVi Studios\\LuaPatcher";
-    std::wstring valueName = L"PulseFramework/LastAdded";
-    
-    std::wstring lastAdded = GetRegistryString(HKEY_CURRENT_USER, subKey, valueName);
-    
-    std::wstring message = L"👋 Welcome back!\n\nSteam Library Manager is ready to help you organize your collection, discover your installed games, and keep everything exactly where you want it.\n\nHappy gaming!";
-    
-    if (!lastAdded.empty()) {
-        message += L"\n\nP.S. You recently added: " + lastAdded + L"!";
-        // Clear it so it only shows once
-        ClearRegistryString(HKEY_CURRENT_USER, subKey, valueName);
-    }
+    // Get the path to PulseUI.exe (same directory as this DLL)
+    wchar_t dllPath[MAX_PATH] = {0};
+    HMODULE hSelf = NULL;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       (LPCWSTR)&PulseThread, &hSelf);
+    GetModuleFileNameW(hSelf, dllPath, MAX_PATH);
 
-    MessageBoxW(NULL, message.c_str(), L"Pulse Framework", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST);
-    
+    // Replace DLL filename with PulseUI.exe
+    std::wstring path(dllPath);
+    size_t lastSlash = path.find_last_of(L'\\');
+    if (lastSlash != std::wstring::npos) {
+        path = path.substr(0, lastSlash + 1);
+    }
+    path += L"PulseUI.exe";
+
+    // Launch PulseUI.exe
+    STARTUPINFOW si = {0};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE; // PulseUI manages its own window visibility
+    PROCESS_INFORMATION pi = {0};
+
+    CreateProcessW(
+        path.c_str(),
+        NULL,
+        NULL, NULL,
+        FALSE,
+        CREATE_NO_WINDOW,
+        NULL, NULL,
+        &si, &pi
+    );
+
+    // Clean up handles
+    if (pi.hProcess) CloseHandle(pi.hProcess);
+    if (pi.hThread) CloseHandle(pi.hThread);
+
     return 0;
 }
 
