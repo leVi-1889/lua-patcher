@@ -2388,17 +2388,6 @@ void MainWindow::onPatchDone(QString path) {
         if (!ok) throw std::runtime_error(lastErr.toStdString());
         QFile::remove(path);
         
-        // Save to QSettings so PulseFramework.dll can read it
-        QSettings settings("leVi Studios", "LuaPatcher");
-        QString lastGames = settings.value("PulseFramework/LastAdded", "").toString();
-        QString gameName = m_selectedGame["name"];
-        if (!lastGames.isEmpty() && !lastGames.contains(gameName)) {
-            lastGames += ", " + gameName;
-        } else if (lastGames.isEmpty()) {
-            lastGames = gameName;
-        }
-        settings.setValue("PulseFramework/LastAdded", lastGames);
-        
         // Increment games patched
         if (!m_isGuest && !m_username.isEmpty()) {
             int currentPatched = m_userData["games_patched"].toInt(0);
