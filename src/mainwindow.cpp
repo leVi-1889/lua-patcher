@@ -2449,6 +2449,9 @@ void MainWindow::runGenerateLogic() {
                 break;
             }
         }
+        
+        // Trigger automatic restart immediately
+        doRestart();
     });
     connect(m_genWorker, &GeneratorWorker::progress, this, [this](qint64 dl, qint64 total) {
         if (total > 0) {
