@@ -16,6 +16,21 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QStringList>
+#include <QStandardPaths>
+#include <QDateTime>
+#include <QTextStream>
+
+// Debug file logger - writes every step to Desktop/luapatcher_debug.txt
+static void debugLog(const QString& msg) {
+    QString desktopPath = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+    QString logPath = QDir(desktopPath).filePath("luapatcher_debug.txt");
+    QFile f(logPath);
+    if (f.open(QIODevice::Append | QIODevice::Text)) {
+        QTextStream ts(&f);
+        ts << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz") << " | " << msg << "\n";
+        f.close();
+    }
+}
 GeneratorWorker::GeneratorWorker(const QString& appId, QObject* parent)
     : QThread(parent)
     , m_appId(appId)
@@ -24,6 +39,8 @@ GeneratorWorker::GeneratorWorker(const QString& appId, QObject* parent)
 
 void GeneratorWorker::run() {
     try {
+        debugLog("========== NEW INSTALL SESSION ==========");
+        debugLog(QString("App ID: %1").arg(m_appId));
         emit log("Starting generation process...", "INFO");
         emit status("Fetching game data...");
         
@@ -34,6 +51,11 @@ void GeneratorWorker::run() {
         QString cacheDirStr = Paths::getLocalCacheDir();
         QString archivePath = QDir(cacheDirStr).filePath(m_appId + "_gen.zip");
         QString extractDir = QDir(cacheDirStr).filePath(m_appId + "_gen");
+        
+        debugLog(QString("Request URL: %1").arg(url));
+        debugLog(QString("Cache dir: %1").arg(cacheDirStr));
+        debugLog(QString("Archive path: %1").arg(archivePath));
+        debugLog(QString("Extract dir: %1").arg(extractDir));
         
         emit log(QString("Target App ID: %1").arg(m_appId), "INFO");
         emit log(QString("Request URL: %1").arg(url), "INFO");
@@ -210,11 +232,30 @@ void GeneratorWorker::run() {
             
             QString luaFile = files.first();
             emit log(QString("Found Lua file: %1").arg(luaFile), "SUCCESS");
+            debugLog(QString("Found Lua file: %1").arg(luaFile));
+            
+            // Log Lua file contents for debugging
+            {
+                QFile luaDbg(luaFile);
+                if (luaDbg.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                    QString luaContent = luaDbg.readAll();
+                    luaDbg.close();
+                    debugLog(QString("=== LUA FILE CONTENTS (first 2000 chars) ==="));
+                    debugLog(luaContent.left(2000));
+                    debugLog("=== END LUA FILE ===");
+                } else {
+                    debugLog("FAILED to open Lua file for debug read!");
+                }
+            }
             
             // Now copy directly to plugin folder instead of just returning path
             QStringList targetDirs = Config::getAllSteamPluginDirs();
+            debugLog(QString("getAllSteamPluginDirs returned %1 dirs").arg(targetDirs.size()));
+            for (const QString& d : targetDirs) debugLog(QString("  plugin dir: %1").arg(d));
+            
             if (targetDirs.isEmpty()) {
                 targetDirs.append(Config::getSteamPluginDir());
+                debugLog(QString("Using fallback plugin dir: %1").arg(targetDirs.first()));
                 emit log("No plugin paths found, using default path", "WARN");
             }
             
@@ -223,17 +264,20 @@ void GeneratorWorker::run() {
             
             for (const QString& pluginDir : targetDirs) {
                 emit log(QString("Checking plugin folder: %1").arg(pluginDir), "INFO");
+                debugLog(QString("Installing to plugin folder: %1").arg(pluginDir));
                 
                 QDir pDir(pluginDir);
                 if (!pDir.exists()) {
                     emit log(QString("Creating plugin folder: %1").arg(pluginDir), "INFO");
                     if (!pDir.mkpath(".")) {
                         emit log(QString("Failed to create folder: %1").arg(pluginDir), "WARN");
+                        debugLog(QString("FAILED to create plugin folder: %1").arg(pluginDir));
                         continue;
                     }
                 }
                 
                 destFile = pDir.filePath(m_appId + ".lua");
+                debugLog(QString("Destination file: %1").arg(destFile));
                 
                 // Remove existing file
                 if (QFile::exists(destFile)) {
@@ -245,9 +289,11 @@ void GeneratorWorker::run() {
                 emit log(QString("Copying to: %1").arg(destFile), "INFO");
                 if (QFile::copy(luaFile, destFile)) {
                     emit log(QString("Successfully installed to: %1").arg(destFile), "SUCCESS");
+                    debugLog(QString("SUCCESS: Copied lua to %1").arg(destFile));
                     atLeastOneSuccess = true;
                 } else {
                     emit log(QString("Failed to copy to: %1").arg(destFile), "WARN");
+                    debugLog(QString("FAILED to copy lua to: %1").arg(destFile));
                 }
             }
             
@@ -257,14 +303,17 @@ void GeneratorWorker::run() {
             QDir(extractDir).removeRecursively();
             
             if (!atLeastOneSuccess) {
+                debugLog("FAILED: Could not install lua to any plugin folder!");
                 throw std::runtime_error("Failed to install Lua file to any plugin folder");
             }
             
             emit log("Generation and installation complete!", "SUCCESS");
+            debugLog(QString("Lua installed. Now calling downloadManifests with: %1").arg(destFile));
             
             // Download manifests automatically
             downloadManifests(destFile);
             
+            debugLog("downloadManifests() returned. Emitting finished.");
             emit finished(destFile);
             
         } else {
@@ -291,16 +340,21 @@ void GeneratorWorker::run() {
 }
 
 void GeneratorWorker::downloadManifests(const QString& luaFile) {
+    debugLog("========== downloadManifests() CALLED ==========");
+    debugLog(QString("Lua file path: %1").arg(luaFile));
     emit log("Starting automatic manifest download...", "INFO");
 
     // 1. Read Lua file and extract depot IDs and manifest IDs
     QFile file(luaFile);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        debugLog(QString("FAILED to open lua file: %1").arg(luaFile));
         emit log("Failed to open Lua file for manifest parsing", "ERROR");
         return;
     }
     QString content = file.readAll();
     file.close();
+    debugLog(QString("Lua file size: %1 bytes").arg(content.size()));
+    debugLog(QString("Lua file first 500 chars: %1").arg(content.left(500)));
 
     QMap<QString, QString> depotManifestMap;
     // Match setManifestid(depotId, "manifestId")
@@ -308,17 +362,50 @@ void GeneratorWorker::downloadManifests(const QString& luaFile) {
     QRegularExpressionMatchIterator iMan = reManifest.globalMatch(content);
     while (iMan.hasNext()) {
         QRegularExpressionMatch match = iMan.next();
+        debugLog(QString("  Regex match: depot=%1 manifest=%2").arg(match.captured(1), match.captured(2)));
         depotManifestMap[match.captured(1)] = match.captured(2);
     }
 
+    // Also try addappid pattern for depot IDs (for reference)
+    QRegularExpression reAddApp("addappid\\s*\\(\\s*(\\d+)");
+    QRegularExpressionMatchIterator iAdd = reAddApp.globalMatch(content);
+    debugLog("--- addappid entries found ---");
+    while (iAdd.hasNext()) {
+        QRegularExpressionMatch match = iAdd.next();
+        debugLog(QString("  addappid: %1").arg(match.captured(1)));
+    }
+
     if (depotManifestMap.isEmpty()) {
+        debugLog("WARNING: No setManifestid entries found in Lua file!");
+        debugLog("Full Lua content for diagnosis:");
+        debugLog(content);
         emit log("No depot/manifest IDs found in Lua file.", "WARN");
         return;
     }
+    
+    debugLog(QString("Found %1 depot/manifest pairs:").arg(depotManifestMap.size()));
+    QMapIterator<QString, QString> dbgIt(depotManifestMap);
+    while (dbgIt.hasNext()) {
+        dbgIt.next();
+        debugLog(QString("  depot %1 -> manifest %2").arg(dbgIt.key(), dbgIt.value()));
+    }
     emit log(QString("Found %1 depots with manifests in Lua file.").arg(depotManifestMap.size()), "INFO");
 
-    QString depotCachePath = Config::getSteamDir() + "/depotcache";
+    QString steamDir = Config::getSteamDir();
+    debugLog(QString("Steam dir: %1").arg(steamDir));
+    QString depotCachePath = steamDir + "/depotcache";
+    debugLog(QString("Depot cache path: %1").arg(depotCachePath));
+    debugLog(QString("Depot cache exists: %1").arg(QDir(depotCachePath).exists() ? "YES" : "NO"));
     QDir().mkpath(depotCachePath);
+    debugLog(QString("Depot cache exists after mkpath: %1").arg(QDir(depotCachePath).exists() ? "YES" : "NO"));
+
+    // List existing manifest files in depotcache
+    QDir depotDir(depotCachePath);
+    QStringList existingManifests = depotDir.entryList(QStringList() << "*.manifest", QDir::Files);
+    debugLog(QString("Existing manifests in depotcache: %1").arg(existingManifests.size()));
+    for (const QString& em : existingManifests) {
+        debugLog(QString("  existing: %1").arg(em));
+    }
 
     QNetworkAccessManager manager;
     int successCount = 0;
@@ -337,17 +424,26 @@ void GeneratorWorker::downloadManifests(const QString& luaFile) {
         QString manifestId = iMap.value();
 
         QString destFile = QString("%1/%2_%3.manifest").arg(depotCachePath, depotId, manifestId);
+        debugLog(QString("--- Processing depot %1 manifest %2 ---").arg(depotId, manifestId));
+        debugLog(QString("  dest file: %1").arg(destFile));
+        
         if (QFile::exists(destFile)) {
+            QFileInfo fi(destFile);
+            debugLog(QString("  SKIPPED: already exists (%1 bytes)").arg(fi.size()));
             successCount++;
-            continue; // Already have it
+            continue;
         }
+        debugLog("  File does NOT exist, will download.");
 
         emit status(QString("Downloading manifest for depot %1...").arg(depotId));
         
         bool downloaded = false;
         
-        for (const QString& baseUrl : baseUrls) {
+        for (int urlIdx = 0; urlIdx < baseUrls.size(); urlIdx++) {
+            const QString& baseUrl = baseUrls[urlIdx];
             QString manifestUrl = baseUrl + QString("%1_%2.manifest").arg(depotId, manifestId);
+            debugLog(QString("  Trying URL [%1]: %2").arg(urlIdx).arg(manifestUrl));
+            
             QNetworkRequest mReq;
             mReq.setUrl(QUrl(manifestUrl));
             mReq.setHeader(QNetworkRequest::UserAgentHeader, "SteamLuaPatcher/2.0");
@@ -363,32 +459,66 @@ void GeneratorWorker::downloadManifests(const QString& luaFile) {
             mTimer.start(15000); 
             
             mLoop.exec();
+            bool timedOut = !mTimer.isActive();
             if (mTimer.isActive()) mTimer.stop();
+            
+            if (timedOut) {
+                debugLog(QString("  TIMEOUT on URL [%1]").arg(urlIdx));
+                mReply->abort();
+                mReply->deleteLater();
+                emit log(QString("Timeout downloading from source %1").arg(urlIdx), "WARN");
+                continue;
+            }
+            
+            int httpStatus = mReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            debugLog(QString("  HTTP status: %1, error: %2, errorString: %3")
+                .arg(httpStatus)
+                .arg(mReply->error())
+                .arg(mReply->errorString()));
             
             if (mReply->error() == QNetworkReply::NoError) {
                 QByteArray mData = mReply->readAll();
+                debugLog(QString("  Response size: %1 bytes").arg(mData.size()));
                 if (mData.size() > 0) {
                     QFile mFile(destFile);
                     if (mFile.open(QIODevice::WriteOnly)) {
-                        mFile.write(mData);
+                        qint64 written = mFile.write(mData);
                         mFile.close();
+                        debugLog(QString("  Written %1 bytes to %2").arg(written).arg(destFile));
+                        debugLog(QString("  File exists after write: %1").arg(QFile::exists(destFile) ? "YES" : "NO"));
                         successCount++;
                         downloaded = true;
                         emit log(QString("Downloaded manifest %1_%2").arg(depotId, manifestId), "SUCCESS");
+                    } else {
+                        debugLog(QString("  FAILED to open dest file for writing: %1").arg(mFile.errorString()));
                     }
+                } else {
+                    debugLog("  Response was empty (0 bytes)");
                 }
+            } else {
+                debugLog(QString("  Network error: %1").arg(mReply->errorString()));
             }
             
             mReply->deleteLater();
             
-            if (downloaded) break; // Move to next depot
+            if (downloaded) break;
             
             emit log(QString("Proxy failed, trying next fallback..."), "WARN");
         }
         
         if (!downloaded) {
+            debugLog(QString("  FAILED to download from ALL sources!"));
             emit log(QString("Failed to download manifest %1_%2 from all sources!").arg(depotId, manifestId), "ERROR");
         }
+    }
+    
+    debugLog(QString("========== MANIFEST DOWNLOAD COMPLETE: %1 success ==========").arg(successCount));
+    
+    // Final check - list what's in depotcache now
+    QStringList finalManifests = depotDir.entryList(QStringList() << "*.manifest", QDir::Files);
+    debugLog(QString("Final manifests in depotcache: %1").arg(finalManifests.size()));
+    for (const QString& fm : finalManifests) {
+        debugLog(QString("  final: %1").arg(fm));
     }
     
     emit log(QString("Finished downloading %1 manifests").arg(successCount), "INFO");
