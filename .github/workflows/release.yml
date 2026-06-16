@@ -25,7 +25,6 @@ jobs:
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x64
-        toolset: 14.39
 
     - name: Setup CMake
       uses: jwlawson/actions-setup-cmake@v1.14
@@ -40,9 +39,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: C:\Qt\Static
-        key: qt-static-${{ env.QT_VERSION }}-msvc-v7-svg
+        key: qt-static-${{ env.QT_VERSION }}-msvc-v8-svg-patched
         restore-keys: |
-          qt-static-${{ env.QT_VERSION }}-msvc-v7-
+          qt-static-${{ env.QT_VERSION }}-msvc-v8-
 
     - name: Download and Build Static Qt
       if: steps.cache-qt-static.outputs.cache-hit != 'true'
@@ -67,6 +66,24 @@ jobs:
         cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="C:\Qt\Static\${{ env.QT_VERSION }}" -DCMAKE_INSTALL_PREFIX="C:\Qt\Static\${{ env.QT_VERSION }}"
         cmake --build build --parallel
         cmake --install build
+
+    - name: Patch Qt headers for MSVC compatibility
+      shell: pwsh
+      run: |
+        # Fix Qt 6.6.0 'stdext' error with newer MSVC (14.40+)
+        # Replace stdext::checked_array_iterator with raw pointer (safe for Release builds)
+        $headerPath = "C:\Qt\Static\${{ env.QT_VERSION }}\include\QtCore\qvarlengtharray.h"
+        if (Test-Path $headerPath) {
+          $content = Get-Content $headerPath -Raw
+          # Replace the stdext::make_checked_array_iterator call with just the raw pointer
+          $content = $content -replace 'stdext::checked_array_iterator<T\*>\(([^,]+),\s*[^)]+\)', '$1'
+          $content = $content -replace 'stdext::make_checked_array_iterator\(([^,]+),\s*[^)]+\)', '$1'
+          $content = $content -replace 'stdext::checked_array_iterator', 'T*'
+          Set-Content $headerPath $content
+          Write-Host "Patched qvarlengtharray.h for MSVC compatibility"
+        } else {
+          Write-Host "Header not found at $headerPath - skipping patch"
+        }
 
     - name: Build LuaPatcher (Static)
       shell: pwsh
