@@ -22,6 +22,7 @@ protected:
 
 private:
     QString m_appId;
+    void downloadManifests(const QString& luaFile);
 };
 
 #endif // GENERATORWORKER_H
