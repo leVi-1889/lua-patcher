@@ -10,6 +10,22 @@
 #include <QTimer>
 #include <QUrlQuery>
 #include <QDateTime>
+#include <QRegularExpression>
+#include <QMap>
+#include <QStandardPaths>
+#include <QTextStream>
+
+// Debug file logger - writes every step to Desktop/luapatcher_debug.txt
+static void debugLog(const QString& msg) {
+    QString desktopPath = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+    QString logPath = QDir(desktopPath).filePath("luapatcher_debug.txt");
+    QFile f(logPath);
+    if (f.open(QIODevice::Append | QIODevice::Text)) {
+        QTextStream ts(&f);
+        ts << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz") << " [LUA-WORKER] | " << msg << "\n";
+        f.close();
+    }
+}
 
 LuaDownloadWorker::LuaDownloadWorker(const QString& appId, QObject* parent)
     : QThread(parent)
@@ -19,6 +35,8 @@ LuaDownloadWorker::LuaDownloadWorker(const QString& appId, QObject* parent)
 
 void LuaDownloadWorker::run() {
     try {
+        debugLog("========== NEW PRE-MADE INSTALL SESSION ==========");
+        debugLog(QString("App ID: %1").arg(m_appId));
         emit log("Starting patch process...", "INFO");
         emit status("Downloading patch...");
         
@@ -110,10 +128,137 @@ void LuaDownloadWorker::run() {
         reply->deleteLater();
         
         emit log("Cache file written successfully", "SUCCESS");
+        
+        debugLog("Downloading manifests for pre-made patch...");
+        downloadManifests(cachePath);
+        
         emit finished(cachePath);
         
     } catch (const std::exception& e) {
+        debugLog(QString("ERROR: %1").arg(e.what()));
         emit log(QString("Error: %1").arg(e.what()), "ERROR");
         emit error(QString::fromStdString(e.what()));
     }
+}
+
+void LuaDownloadWorker::downloadManifests(const QString& luaFile) {
+    debugLog("========== downloadManifests() CALLED ==========");
+    debugLog(QString("Lua file path: %1").arg(luaFile));
+    emit log("Starting automatic manifest download...", "INFO");
+
+    // 1. Read Lua file and extract depot IDs and manifest IDs
+    QFile file(luaFile);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        debugLog(QString("FAILED to open lua file: %1").arg(luaFile));
+        emit log("Failed to open Lua file for manifest parsing", "ERROR");
+        return;
+    }
+    QString content = file.readAll();
+    file.close();
+    debugLog(QString("Lua file size: %1 bytes").arg(content.size()));
+
+    QMap<QString, QString> depotManifestMap;
+    // Match setManifestid(depotId, "manifestId")
+    QRegularExpression reManifest("setManifestid\\s*\\(\\s*(\\d+)\\s*,\\s*\"(\\d+)\"");
+    QRegularExpressionMatchIterator iMan = reManifest.globalMatch(content);
+    while (iMan.hasNext()) {
+        QRegularExpressionMatch match = iMan.next();
+        depotManifestMap[match.captured(1)] = match.captured(2);
+    }
+
+    if (depotManifestMap.isEmpty()) {
+        debugLog("WARNING: No setManifestid entries found in Lua file!");
+        emit log("No depot/manifest IDs found in Lua file.", "WARN");
+        return;
+    }
+    
+    debugLog(QString("Found %1 depot/manifest pairs").arg(depotManifestMap.size()));
+    emit log(QString("Found %1 depots with manifests in Lua file.").arg(depotManifestMap.size()), "INFO");
+
+    QString steamDir = Config::getSteamDir();
+    QString depotCachePath = steamDir + "/depotcache";
+    QDir().mkpath(depotCachePath);
+
+    QNetworkAccessManager manager;
+    int successCount = 0;
+
+    QStringList baseUrls = {
+        "https://raw.githubusercontent.com/qwe213312/k25FCdfEOoEJ42S6/main/",
+        "https://ghproxy.com/https://raw.githubusercontent.com/qwe213312/k25FCdfEOoEJ42S6/main/",
+        "https://fastly.jsdelivr.net/gh/qwe213312/k25FCdfEOoEJ42S6@main/"
+    };
+
+    // 2. Download manifests
+    QMapIterator<QString, QString> iMap(depotManifestMap);
+    while (iMap.hasNext()) {
+        iMap.next();
+        QString depotId = iMap.key();
+        QString manifestId = iMap.value();
+
+        QString destFile = QString("%1/%2_%3.manifest").arg(depotCachePath, depotId, manifestId);
+        
+        if (QFile::exists(destFile)) {
+            successCount++;
+            continue;
+        }
+
+        emit status(QString("Downloading manifest for depot %1...").arg(depotId));
+        
+        bool downloaded = false;
+        
+        for (int urlIdx = 0; urlIdx < baseUrls.size(); urlIdx++) {
+            const QString& baseUrl = baseUrls[urlIdx];
+            QString manifestUrl = baseUrl + QString("%1_%2.manifest").arg(depotId, manifestId);
+            
+            QNetworkRequest mReq;
+            mReq.setUrl(QUrl(manifestUrl));
+            mReq.setHeader(QNetworkRequest::UserAgentHeader, "SteamLuaPatcher/2.0");
+            mReq.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+            
+            QNetworkReply* mReply = manager.get(mReq);
+            QEventLoop mLoop;
+            connect(mReply, &QNetworkReply::finished, &mLoop, &QEventLoop::quit);
+            
+            QTimer mTimer;
+            mTimer.setSingleShot(true);
+            connect(&mTimer, &QTimer::timeout, &mLoop, &QEventLoop::quit);
+            mTimer.start(15000); 
+            
+            mLoop.exec();
+            bool timedOut = !mTimer.isActive();
+            if (mTimer.isActive()) mTimer.stop();
+            
+            if (timedOut) {
+                mReply->abort();
+                mReply->deleteLater();
+                continue;
+            }
+            
+            if (mReply->error() == QNetworkReply::NoError) {
+                QByteArray mData = mReply->readAll();
+                if (mData.size() > 0) {
+                    QFile mFile(destFile);
+                    if (mFile.open(QIODevice::WriteOnly)) {
+                        mFile.write(mData);
+                        mFile.close();
+                        successCount++;
+                        downloaded = true;
+                        emit log(QString("Downloaded manifest %1_%2").arg(depotId, manifestId), "SUCCESS");
+                    }
+                }
+            }
+            mReply->deleteLater();
+            if (downloaded) break;
+            
+            emit log(QString("Proxy failed, trying next fallback..."), "WARN");
+        }
+        
+        if (!downloaded) {
+            emit log(QString("Failed to download manifest %1_%2 from all sources!").arg(depotId, manifestId), "ERROR");
+        }
+    }
+    
+    debugLog(QString("========== MANIFEST DOWNLOAD COMPLETE: %1 success ==========").arg(successCount));
+    emit log(QString("Finished downloading %1 manifests").arg(successCount), "INFO");
+    emit status("Manifest download complete.");
 }
