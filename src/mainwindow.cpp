@@ -2409,6 +2409,9 @@ void MainWindow::onPatchDone(QString path) {
         if (m_stack->currentIndex() == 3) {
             m_gameDetailsPage->installFinished();
         }
+        
+        // Restart Steam so it actually loads the new Lua file and manifests
+        doRestart();
     } catch (const std::exception& e) {
         onPatchError(QString::fromStdString(e.what()));
     }
