@@ -39,9 +39,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: C:\Qt\Static
-        key: qt-static-${{ env.QT_VERSION }}-msvc-v9-svg-patched
+        key: qt-static-${{ env.QT_VERSION }}-msvc-v10-svg-patched
         restore-keys: |
-          qt-static-${{ env.QT_VERSION }}-msvc-v9-
+          qt-static-${{ env.QT_VERSION }}-msvc-v10-
 
     - name: Download and Build Static Qt
       if: steps.cache-qt-static.outputs.cache-hit != 'true'
@@ -53,14 +53,13 @@ jobs:
         aqt install-src windows ${{ env.QT_VERSION }} --outputdir "C:\Qt\Source" --archives qtbase qtsvg
         
         # Fix Qt 6.6.0 'stdext' error with newer MSVC (14.40+) before building
-        $headerPath = "C:\Qt\Source\${{ env.QT_VERSION }}\Src\qtbase\src\corelib\tools\qvarlengtharray.h"
+        $headerPath = "C:\Qt\Source\${{ env.QT_VERSION }}\Src\qtbase\src\corelib\global\qcompilerdetection.h"
         if (Test-Path $headerPath) {
           $content = Get-Content $headerPath -Raw
-          $content = $content -replace 'stdext::checked_array_iterator<T\*>\(([^,]+),\s*[^)]+\)', '$1'
-          $content = $content -replace 'stdext::make_checked_array_iterator\(([^,]+),\s*[^)]+\)', '$1'
-          $content = $content -replace 'stdext::checked_array_iterator', 'T*'
+          $content = $content.Replace("stdext::make_unchecked_array_iterator(x)", "(x)")
+          $content = $content.Replace("stdext::make_checked_array_iterator(x, size_t(N))", "(x)")
           Set-Content $headerPath $content
-          Write-Host "Patched qvarlengtharray.h for MSVC compatibility"
+          Write-Host "Patched qcompilerdetection.h for MSVC compatibility"
         }
         
         # Build qtbase first
