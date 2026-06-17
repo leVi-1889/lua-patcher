@@ -172,6 +172,12 @@ void LuaDownloadWorker::downloadManifests(const QString& luaFile) {
         return;
     }
     
+    // Helper to validate manifest
+    auto isInvalidManifest = [](const QByteArray& data) {
+        QString str = QString::fromUtf8(data.left(100)).trimmed().toLower();
+        return str.startsWith("<!doctype") || str.startsWith("<html") || str.contains("404: not found") || str.contains("package size exceeded") || data.isEmpty();
+    };
+    
     debugLog(QString("Found %1 depot/manifest pairs").arg(depotManifestMap.size()));
     emit log(QString("Found %1 depots with manifests in Lua file.").arg(depotManifestMap.size()), "INFO");
 
@@ -198,8 +204,18 @@ void LuaDownloadWorker::downloadManifests(const QString& luaFile) {
         QString destFile = QString("%1/%2_%3.manifest").arg(depotCachePath, depotId, manifestId);
         
         if (QFile::exists(destFile)) {
-            successCount++;
-            continue;
+            QFile existingFile(destFile);
+            if (existingFile.open(QIODevice::ReadOnly)) {
+                QByteArray header = existingFile.read(100);
+                existingFile.close();
+                if (isInvalidManifest(header)) {
+                    debugLog(QString("  DELETING existing invalid HTML manifest: %1").arg(destFile));
+                    QFile::remove(destFile);
+                } else {
+                    successCount++;
+                    continue;
+                }
+            }
         }
 
         emit status(QString("Downloading manifest for depot %1...").arg(depotId));
@@ -236,7 +252,9 @@ void LuaDownloadWorker::downloadManifests(const QString& luaFile) {
             
             if (mReply->error() == QNetworkReply::NoError) {
                 QByteArray mData = mReply->readAll();
-                if (mData.size() > 0) {
+                if (isInvalidManifest(mData)) {
+                    debugLog("  ERROR: Downloaded data is an HTML error page, not a manifest!");
+                } else if (mData.size() > 0) {
                     QFile mFile(destFile);
                     if (mFile.open(QIODevice::WriteOnly)) {
                         mFile.write(mData);

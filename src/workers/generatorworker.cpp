@@ -339,6 +339,12 @@ void GeneratorWorker::run() {
     }
 }
 
+// Helper to validate manifest
+static bool isInvalidManifestGen(const QByteArray& data) {
+    QString str = QString::fromUtf8(data.left(100)).trimmed().toLower();
+    return str.startsWith("<!doctype") || str.startsWith("<html") || str.contains("404: not found") || str.contains("package size exceeded") || data.isEmpty();
+}
+
 void GeneratorWorker::downloadManifests(const QString& luaFile) {
     debugLog("========== downloadManifests() CALLED ==========");
     debugLog(QString("Lua file path: %1").arg(luaFile));
@@ -428,10 +434,20 @@ void GeneratorWorker::downloadManifests(const QString& luaFile) {
         debugLog(QString("  dest file: %1").arg(destFile));
         
         if (QFile::exists(destFile)) {
-            QFileInfo fi(destFile);
-            debugLog(QString("  SKIPPED: already exists (%1 bytes)").arg(fi.size()));
-            successCount++;
-            continue;
+            QFile existingFile(destFile);
+            if (existingFile.open(QIODevice::ReadOnly)) {
+                QByteArray header = existingFile.read(100);
+                existingFile.close();
+                if (isInvalidManifestGen(header)) {
+                    debugLog(QString("  DELETING existing invalid HTML manifest: %1").arg(destFile));
+                    QFile::remove(destFile);
+                } else {
+                    QFileInfo fi(destFile);
+                    debugLog(QString("  SKIPPED: already exists (%1 bytes)").arg(fi.size()));
+                    successCount++;
+                    continue;
+                }
+            }
         }
         debugLog("  File does NOT exist, will download.");
 
@@ -479,7 +495,9 @@ void GeneratorWorker::downloadManifests(const QString& luaFile) {
             if (mReply->error() == QNetworkReply::NoError) {
                 QByteArray mData = mReply->readAll();
                 debugLog(QString("  Response size: %1 bytes").arg(mData.size()));
-                if (mData.size() > 0) {
+                if (isInvalidManifestGen(mData)) {
+                    debugLog("  ERROR: Downloaded data is an HTML error page, not a manifest!");
+                } else if (mData.size() > 0) {
                     QFile mFile(destFile);
                     if (mFile.open(QIODevice::WriteOnly)) {
                         qint64 written = mFile.write(mData);
