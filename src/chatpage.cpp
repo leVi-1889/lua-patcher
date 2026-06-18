@@ -219,7 +219,11 @@ void ChatPage::sendMessage() {
 
 void ChatPage::fetchHistory() {
     QUrl url(Config::WEBSERVER_BASE_URL + "/api/social/chat/history");
-    url.setQuery("user1=" + m_myUsername + "&user2=" + m_friendUsername);
+    QString queryStr = "user1=" + m_myUsername + "&user2=" + m_friendUsername;
+    if (!m_lastFetchTimestamp.isEmpty()) {
+        queryStr += "&after=" + m_lastFetchTimestamp;
+    }
+    url.setQuery(queryStr);
     
     QNetworkReply* reply = m_netMgr->get(QNetworkRequest(url));
     connect(reply, &QNetworkReply::finished, this, &ChatPage::onHistoryFetched);
@@ -237,25 +241,16 @@ void ChatPage::onHistoryFetched() {
 
     QJsonArray arr = doc.array();
     
-    // Optimization: Only redraw if count changed or for first load
-    if (arr.size() == m_lastMessageCount) return;
-    m_lastMessageCount = arr.size();
-
-    // Clear old messages (except stretch)
-    while (m_chatLayout->count() > 1) {
-        QLayoutItem* item = m_chatLayout->takeAt(0);
-        if (item->widget()) {
-            item->widget()->hide();
-            item->widget()->deleteLater();
-        }
-        delete item;
-    }
+    if (arr.isEmpty()) return;
 
     for (int i = 0; i < arr.size(); ++i) {
         QJsonObject obj = arr[i].toObject();
         QString sender = obj["sender_username"].toString();
         QString text = obj["message_text"].toString();
         QString timeStr = obj["created_at"].toString();
+        
+        // Always track the latest timestamp
+        m_lastFetchTimestamp = timeStr;
         
         // Parse timestamp for display (e.g. 2024-04-26T14:22:56...)
         QDateTime dt = QDateTime::fromString(timeStr, Qt::ISODate);

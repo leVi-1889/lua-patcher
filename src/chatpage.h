@@ -47,6 +47,7 @@ private:
     QLabel* m_friendNameLabel;
     
     int m_lastMessageCount = 0;
+    QString m_lastFetchTimestamp;
 };
 
 #endif // CHATPAGE_H

@@ -2829,22 +2829,22 @@ void MainWindow::setInitialUser(const QString& username, const QJsonObject& data
             sendHeartbeat(); // Send first heartbeat immediately
         }
         
-        // Start Notification Polling Timer (every 30 seconds)
+        // Start Notification Polling Timer (every 120 seconds)
         if (!m_notifTimer) {
             m_notifTimer = new QTimer(this);
             connect(m_notifTimer, &QTimer::timeout, this, [this]() {
                 fetchNotificationCount();
                 refreshFriendsList();
             });
-            m_notifTimer->start(30000); // 30 seconds
+            m_notifTimer->start(120000); // 120 seconds
             fetchNotificationCount(); // Fetch immediately
         }
         
-        // Start Background Chat Poller for unread messages (every 5 seconds)
+        // Start Background Chat Poller for unread messages (every 60 seconds)
         if (!m_chatPollerTimer) {
             m_chatPollerTimer = new QTimer(this);
             connect(m_chatPollerTimer, &QTimer::timeout, this, &MainWindow::pollChatHistories);
-            m_chatPollerTimer->start(5000); // 5 seconds
+            m_chatPollerTimer->start(60000); // 60 seconds
         }
     }
     updateSidebarAvatar();
@@ -2862,7 +2862,7 @@ void MainWindow::pollChatHistories() {
     if (m_isGuest || m_username.isEmpty()) return;
     
     for (const QString& friendName : m_friendUsernames) {
-        QUrl url(Config::WEBSERVER_BASE_URL + "/api/social/chat/history");
+        QUrl url(Config::WEBSERVER_BASE_URL + "/api/social/chat/count");
         QUrlQuery query;
         query.addQueryItem("user1", m_username);
         query.addQueryItem("user2", friendName);
@@ -2876,9 +2876,9 @@ void MainWindow::pollChatHistories() {
             if (reply->error() != QNetworkReply::NoError) return;
             
             QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-            if (!doc.isArray()) return;
+            if (!doc.isObject()) return;
             
-            int msgCount = doc.array().size();
+            int msgCount = doc.object()["count"].toInt();
             
             QSettings settings("leVi Studios", "LuaPatcher");
             int savedMsgCount = settings.value("Social/MsgCount_" + friendName, 0).toInt();
