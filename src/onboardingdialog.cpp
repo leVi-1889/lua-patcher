@@ -161,8 +161,7 @@ void LoadingWidget::onPatchError(const QString& err) {
     m_patchSuccess = false;
     m_patchCompleted = true;
     m_errorMsg = "Steam patch failed: " + err;
-    stop();
-    emit failed(m_errorMsg);
+    qDebug() << "Steam patch error (ignored to allow login):" << err;
 }
 
 void LoadingWidget::onUpdate() {
@@ -200,11 +199,9 @@ void LoadingWidget::onUpdate() {
         // Complete loading successfully when bar is 100% and patch is done
         if (m_progress >= 1.0f && m_patchCompleted) {
             m_animationTimer->stop();
-            if (m_patchSuccess) {
-                emit success();
-            } else {
-                emit failed(m_errorMsg);
-            }
+            // We emit success even if Steam patch failed. 
+            // Users should not be blocked from entering the app just because Steam isn't installed.
+            emit success();
         }
     }
 
