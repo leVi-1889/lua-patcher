@@ -24,7 +24,7 @@ import threading
 from pathlib import Path
 
 
-REPO_URL   = "https://github.com/SteamAutoCracks/ManifestHub.git"
+REPO_URL   = "https://github.com/SSMGAlt/ManifestHub2.git"
 CLONE_DIR  = "ManifestHub"
 OUTPUT_DIR = "games"
 

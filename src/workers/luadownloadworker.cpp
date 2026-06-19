@@ -191,7 +191,10 @@ void LuaDownloadWorker::downloadManifests(const QString& luaFile) {
     QStringList baseUrls = {
         "https://raw.githubusercontent.com/qwe213312/k25FCdfEOoEJ42S6/main/",
         "https://ghproxy.com/https://raw.githubusercontent.com/qwe213312/k25FCdfEOoEJ42S6/main/",
-        "https://fastly.jsdelivr.net/gh/qwe213312/k25FCdfEOoEJ42S6@main/"
+        "https://fastly.jsdelivr.net/gh/qwe213312/k25FCdfEOoEJ42S6@main/",
+        QString("https://raw.githubusercontent.com/SSMGAlt/ManifestHub2/%1/").arg(m_appId),
+        QString("https://ghproxy.com/https://raw.githubusercontent.com/SSMGAlt/ManifestHub2/%1/").arg(m_appId),
+        QString("https://fastly.jsdelivr.net/gh/SSMGAlt/ManifestHub2@%1/").arg(m_appId)
     };
 
     // 2. Download manifests

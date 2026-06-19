@@ -242,20 +242,31 @@ function Download-Manifest {
     $githubUrl = "https://raw.githubusercontent.com/qwe213312/k25FCdfEOoEJ42S6/main/${DepotId}_${ManifestId}.manifest"
 
     # Always try GitHub first
-    $githubResult = Try-DownloadUrl -Url $githubUrl -OutputFile $outputFile -MaxRetries 2 -Label "GitHub" -RetryDelaySeconds $RetryDelaySeconds
+    $githubResult = Try-DownloadUrl -Url $githubUrl -OutputFile $outputFile -MaxRetries 2 -Label "GitHub Mirror" -RetryDelaySeconds $RetryDelaySeconds
 
     if ($githubResult.Success) {
         return @{ Success = $true; FilePath = $outputFile; Size = $githubResult.Size; Attempts = $githubResult.Attempts }
     }
 
-    # On GitHub 404 and mode has a secondary API, try it
+    # If GitHub Mirror fails, try SSMGAlt/ManifestHub2 (public, no key needed)
+    if ($githubResult.Is404 -and $script:AppId) {
+        Write-Host "      Not on GitHub Mirror, trying ManifestHub2 (public)..." -ForegroundColor DarkGray
+        $mh2Url = "https://raw.githubusercontent.com/SSMGAlt/ManifestHub2/$($script:AppId)/${DepotId}_${ManifestId}.manifest"
+        $mh2Result = Try-DownloadUrl -Url $mh2Url -OutputFile $outputFile -MaxRetries 2 -Label "ManifestHub2" -RetryDelaySeconds $RetryDelaySeconds
+        if ($mh2Result.Success) {
+            return @{ Success = $true; FilePath = $outputFile; Size = $mh2Result.Size; Attempts = $mh2Result.Attempts }
+        }
+        $githubResult = $mh2Result # update fallback details if ManifestHub2 also fails
+    }
+
+    # On GitHub/ManifestHub2 404 and mode has a secondary API, try it
     if ($githubResult.Is404 -and $Mode -ne "github") {
         if ($Mode -eq "github+morrenus") {
-            Write-Host "      Not on GitHub, trying Morrenus..." -ForegroundColor DarkGray
+            Write-Host "      Not on GitHub/ManifestHub2, trying Morrenus..." -ForegroundColor DarkGray
             $secondaryUrl = "https://hubcapmanifest.com/api/v1/generate/manifest?depot_id=${DepotId}&manifest_id=${ManifestId}&api_key=${ApiKey}"
             $secondaryLabel = "Morrenus"
         } else {
-            Write-Host "      Not on GitHub, trying ManifestHub..." -ForegroundColor DarkGray
+            Write-Host "      Not on GitHub/ManifestHub2, trying ManifestHub API..." -ForegroundColor DarkGray
             $secondaryUrl = "https://api.manifesthub1.filegear-sg.me/manifest?apikey=${ApiKey}&depotid=${DepotId}&manifestid=${ManifestId}"
             $secondaryLabel = "ManifestHub"
         }
