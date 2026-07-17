@@ -1,0 +1,77 @@
+name: Build Check
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v1.14
+      with:
+        cmake-version: '3.27.x'
+
+    - name: Setup Ninja
+      uses: ashutoshvarma/setup-ninja@v1.1
+
+    - name: Cache Static Qt
+      id: cache-qt-static
+      uses: actions/cache@v4
+      with:
+        path: C:\Qt\Static
+        key: qt-static-6.6.0-msvc-v10-svg-patched
+        restore-keys: |
+          qt-static-6.6.0-msvc-v10-
+
+    - name: Download and Build Static Qt
+      if: steps.cache-qt-static.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        Write-Host "Downloading Qt 6.6.0 source..."
+        pip install aqtinstall
+        New-Item -ItemType Directory -Force -Path "C:\Qt\Source"
+        aqt install-src windows 6.6.0 --outputdir "C:\Qt\Source" --archives qtbase qtsvg
+        
+        $headerPath = "C:\Qt\Source\6.6.0\Src\qtbase\src\corelib\global\qcompilerdetection.h"
+        if (Test-Path $headerPath) {
+          $content = Get-Content $headerPath -Raw
+          $content = $content.Replace("stdext::make_unchecked_array_iterator(x)", "(x)")
+          $content = $content.Replace("stdext::make_checked_array_iterator(x, size_t(N))", "(x)")
+          Set-Content $headerPath $content
+        }
+        
+        $qtbasePath = "C:\Qt\Source\6.6.0\Src\qtbase"
+        Set-Location $qtbasePath
+        & cmd /c "configure.bat -release -static -static-runtime -prefix C:\Qt\Static\6.6.0 -opensource -confirm-license -nomake examples -nomake tests -schannel -no-opengl -no-feature-sql"
+        cmake --build . --parallel
+        cmake --install .
+        
+        $qtsvgPath = "C:\Qt\Source\6.6.0\Src\qtsvg"
+        Set-Location $qtsvgPath
+        $env:CMAKE_PREFIX_PATH = "C:\Qt\Static\6.6.0"
+        cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="C:\Qt\Static\6.6.0" -DCMAKE_INSTALL_PREFIX="C:\Qt\Static\6.6.0"
+        cmake --build build --parallel
+        cmake --install build
+
+    - name: Build LuaPatcher
+      shell: pwsh
+      run: |
+        $env:CMAKE_PREFIX_PATH = "C:\Qt\Static\6.6.0"
+        New-Item -ItemType Directory -Force -Path build
+        Set-Location build
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_STATIC=ON -DACCESS_TOKEN="${{ secrets.SERVER_ACCESS_TOKEN }}" ..
+        cmake --build . --config Release
