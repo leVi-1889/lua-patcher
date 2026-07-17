@@ -20,16 +20,8 @@
 #include <QDateTime>
 #include <QTextStream>
 
-// Debug file logger - writes every step to Desktop/luapatcher_debug.txt
-static void debugLog(const QString& msg) {
-    QString desktopPath = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
-    QString logPath = QDir(desktopPath).filePath("luapatcher_debug.txt");
-    QFile f(logPath);
-    if (f.open(QIODevice::Append | QIODevice::Text)) {
-        QTextStream ts(&f);
-        ts << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz") << " | " << msg << "\n";
-        f.close();
-    }
+static void debugLog(const QString& /*msg*/) {
+    // Debug file generation feature removed
 }
 GeneratorWorker::GeneratorWorker(const QString& appId, QObject* parent)
     : QThread(parent)
