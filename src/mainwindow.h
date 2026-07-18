@@ -38,7 +38,6 @@ class LoadingSpinner;
 class IndexDownloadWorker;
 
 class LuaDownloadWorker;
-class RestartWorker;
 class GeneratorWorker;
 class SteamPatchWorker;
 
@@ -107,7 +106,7 @@ private slots:
     void runGenerateLogic();
     void onPatchDone(QString path);
     void onPatchError(QString error);
-    void doRestart();
+
     void doRemoveGame();
     void switchMode(AppMode mode);
     void updateModeUI();
@@ -218,7 +217,7 @@ private:
     GlassButton* m_tabDiscord;
     AppMode m_currentMode;
 
-    GlassButton* m_btnRestart;
+
     TerminalDialog* m_terminalDialog;
 
     // Details Page
@@ -263,7 +262,7 @@ private:
     IndexDownloadWorker* m_syncWorker;
     LuaDownloadWorker* m_dlWorker;
     GeneratorWorker* m_genWorker;
-    RestartWorker* m_restartWorker;
+
     SteamPatchWorker* m_steamPatchWorker = nullptr;
     
     // Batch name fetching

@@ -14,7 +14,7 @@
 #include "workers/indexdownloadworker.h"
 #include "workers/luadownloadworker.h"
 #include "workers/generatorworker.h"
-#include "workers/restartworker.h"
+
 #include "workers/steampatchworker.h"
 #include "utils/colors.h"
 #include "utils/gameinfo.h"
@@ -181,7 +181,7 @@ MainWindow::MainWindow(QWidget* parent)
     , m_syncWorker(nullptr)
     , m_dlWorker(nullptr)
     , m_genWorker(nullptr)
-    , m_restartWorker(nullptr)
+
     , m_fetchingNames(false)
     , m_nameFetchSearchId(0)
     , m_hasCachedData(false)
@@ -832,11 +832,7 @@ void MainWindow::initUI() {
 
     sidebarInnerLayout->addStretch();
 
-    m_btnRestart = new GlassButton(MaterialIcons::Steam, " Restart Steam", "", Colors::OUTLINE);
-    m_btnRestart->setFixedHeight(45);
-    connect(m_btnRestart, &QPushButton::clicked, this, &MainWindow::doRestart);
-    sidebarInnerLayout->addWidget(m_btnRestart);
-    sidebarInnerLayout->addSpacing(8);
+
 
     m_tabSettings = new GlassButton(MaterialIcons::Settings, " Settings", "", Colors::OUTLINE);
     m_tabSettings->setFixedHeight(45);
@@ -2410,8 +2406,7 @@ void MainWindow::onPatchDone(QString path) {
             m_gameDetailsPage->installFinished();
         }
         
-        // Restart Steam so it actually loads the new Lua file and manifests
-        doRestart();
+
     } catch (const std::exception& e) {
         onPatchError(QString::fromStdString(e.what()));
     }
@@ -2453,8 +2448,7 @@ void MainWindow::runGenerateLogic() {
             }
         }
         
-        // Trigger automatic restart immediately
-        doRestart();
+
     });
     connect(m_genWorker, &GeneratorWorker::progress, this, [this](qint64 dl, qint64 total) {
         if (total > 0) {
@@ -2471,11 +2465,7 @@ void MainWindow::runGenerateLogic() {
     m_genWorker->start();
 }
 
-void MainWindow::doRestart() {
-    m_restartWorker = new RestartWorker(this);
-    connect(m_restartWorker, &RestartWorker::finished, m_statusLabel, &QLabel::setText);
-    m_restartWorker->start();
-}
+
 
 // ---- Mode switching ----
 void MainWindow::cancelNameFetches() {
