@@ -43,9 +43,9 @@ namespace Config {
         
         // Common Steam installation paths to check on each drive
         QStringList steamPaths = {
-            ":/Program Files (x86)/Steam/config/stplug-in",
-            ":/Program Files/Steam/config/stplug-in",
-            ":/Steam/config/stplug-in"
+            ":/Program Files (x86)/Steam/config/lua",
+            ":/Program Files/Steam/config/lua",
+            ":/Steam/config/lua"
         };
         
         // Check all drives from A to Z
@@ -96,10 +96,10 @@ namespace Config {
         if (!exePaths.isEmpty()) {
              QFileInfo fi(exePaths.first());
              QString configDir = fi.absoluteDir().filePath("config");
-             QDir(configDir).mkpath("stplug-in");
-             return configDir + "/stplug-in";
+             QDir(configDir).mkpath("lua");
+             return configDir + "/lua";
         }
-        return "C:/Program Files (x86)/Steam/config/stplug-in";
+        return "C:/Program Files (x86)/Steam/config/lua";
     }
     
     inline QString getSteamExePath() {
